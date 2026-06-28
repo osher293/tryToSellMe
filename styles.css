@@ -602,10 +602,22 @@ button:disabled {
   font-weight: 700;
 }
 
-.line-row div {
+.line-row-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+}
+
+.line-row-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  min-width: 0;
+}
+
+.line-row-info span {
+  flex: 1 1 100%;
 }
 
 #assign-line-select {
@@ -699,6 +711,43 @@ button:disabled {
   #admin-screen .list-row {
     grid-template-columns: 1fr 130px 72px;
     align-items: center;
+  }
+
+  #admin-screen .line-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 0;
+  }
+
+  #admin-screen .line-row-info {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  #admin-screen .line-row-info b {
+    flex-shrink: 0;
+  }
+
+  #admin-screen .line-row-info span {
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #admin-screen .line-row-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  #admin-screen .line-row-actions button {
+    min-height: 38px;
+    padding: 0 16px;
   }
 
   .bottom-nav {

@@ -830,13 +830,21 @@ function renderLines(filter = "") {
     row.className = "line-row";
     row.dataset.filterText = haystack;
 
+    const info = document.createElement("div");
+    info.className = "line-row-info";
+
     const title = document.createElement("b");
     title.textContent = `קו ${line.number}`;
 
+    const areasText = line.areas.join(" · ");
     const areas = document.createElement("span");
-    areas.textContent = line.areas.join(" · ");
+    areas.textContent = areasText;
+    areas.title = areasText;
+
+    info.append(title, areas);
 
     const actions = document.createElement("div");
+    actions.className = "line-row-actions";
     const editBtn = document.createElement("button");
     editBtn.type = "button";
     editBtn.textContent = "עריכה";
@@ -849,7 +857,7 @@ function renderLines(filter = "") {
     deleteBtn.addEventListener("click", () => deleteLine(line));
 
     actions.append(editBtn, deleteBtn);
-    row.append(title, areas, actions);
+    row.append(info, actions);
     linesList.appendChild(row);
   });
 }
