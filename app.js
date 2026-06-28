@@ -1103,6 +1103,9 @@ let cityStreetsData = null;
 async function ensureCityStreetsLoaded() {
   if (cityStreetsData) return cityStreetsData;
   const response = await fetch("data/cities-streets.json");
+  if (!response.ok) {
+    throw new Error(`failed to load city streets database (HTTP ${response.status})`);
+  }
   cityStreetsData = await response.json();
   return cityStreetsData;
 }
@@ -1150,7 +1153,13 @@ async function loadCityStreets() {
     return;
   }
 
-  await ensureCityStreetsLoaded();
+  try {
+    await ensureCityStreetsLoaded();
+  } catch (error) {
+    window.alert("טעינת מאגר הרחובות נכשלה. בדוק שהקובץ data/cities-streets.json נגיש מהשרת שאתה מריץ, ונסה לרענן את הדף.");
+    return;
+  }
+
   const matchedCity = findCityMatch(city);
 
   if (!matchedCity) {
@@ -1218,7 +1227,11 @@ function renderCityDatabaseSelect() {
 
   if (!cityStreetsData) {
     select.innerHTML = '<option value="">טוען ערים...</option>';
-    ensureCityStreetsLoaded().then(() => renderCityDatabaseSelect());
+    ensureCityStreetsLoaded()
+      .then(() => renderCityDatabaseSelect())
+      .catch(() => {
+        select.innerHTML = '<option value="">טעינת המאגר נכשלה - בדוק את השרת ורענן</option>';
+      });
     return;
   }
 
