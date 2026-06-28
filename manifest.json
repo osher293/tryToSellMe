@@ -1,0 +1,19 @@
+{
+  "name": "מערכת קווי חלוקה",
+  "short_name": "קווי חלוקה",
+  "description": "איתור קווי חלוקה לעובדי מחסן",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f2f5f7",
+  "theme_color": "#005fcc",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

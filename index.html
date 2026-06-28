@@ -3,7 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="מערכת לאיתור קווי חלוקה לעובדי מחסן ומנהלי קווים" />
+    <meta name="theme-color" content="#005fcc" />
     <title>מערכת קווי חלוקה</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;700;800;900&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -11,7 +18,7 @@
       <main class="screen active" id="login-screen" aria-labelledby="login-title">
         <section class="top-panel">
           <div class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 48 48" role="img">
+            <svg viewBox="0 0 48 48" role="img" aria-label="משאית">
               <path d="M6 17h24v22H6z" />
               <path d="M30 24h7l5 6v9H30z" />
               <circle cx="16" cy="39" r="4" />
@@ -26,18 +33,21 @@
         <section class="card auth-card" id="phone-step">
           <label for="phone">מספר טלפון</label>
           <input id="phone" type="tel" inputmode="tel" placeholder="050-0000000" autocomplete="tel" />
-          <button class="primary-btn" id="send-code">שלח קוד אימות</button>
+          <button class="primary-btn" id="send-code" type="button">שלח קוד אימות</button>
         </section>
 
         <section class="card auth-card hidden" id="otp-step">
           <label for="otp">קוד OTP</label>
-          <input id="otp" type="text" inputmode="numeric" maxlength="6" placeholder="הזן קוד אימות" />
-          <button class="primary-btn" id="verify-code">כניסה למערכת</button>
-          <button class="text-btn" id="back-to-phone">החלף מספר טלפון</button>
+          <input id="otp" type="text" inputmode="numeric" maxlength="6" placeholder="הזן קוד אימות" aria-describedby="otp-hint" />
+          <p class="auth-hint" id="otp-hint"></p>
+          <button class="primary-btn" id="verify-code" type="button">אמת קוד</button>
+          <button class="text-btn" id="back-to-phone" type="button">החלף מספר טלפון</button>
         </section>
 
-        <div class="error-banner hidden" id="access-error" role="alert">
-          אין לך גישה למערכת, פנה למנהל
+        <div class="error-banner hidden" id="access-error" role="alert" aria-live="assertive"></div>
+
+        <div class="status-banner hidden" id="auth-status" role="status" aria-live="polite">
+          יוצר ארגון ומשייך אדמין...
         </div>
       </main>
 
@@ -46,8 +56,9 @@
           <div>
             <p>מסך חיפוש</p>
             <h2 id="search-title">איתור קו חלוקה</h2>
+            <small class="session-summary" id="session-summary"></small>
           </div>
-          <button class="icon-btn" id="logout-btn" aria-label="יציאה">
+          <button class="icon-btn logout-btn" type="button" aria-label="יציאה">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M10 17l-1.4-1.4L11.2 13H3v-2h8.2L8.6 8.4 10 7l5 5z" />
               <path d="M13 3h7v18h-7v-2h5V5h-5z" />
@@ -57,17 +68,17 @@
 
         <section class="search-hero card">
           <label for="address-search">חיפוש כתובת</label>
-          <input id="address-search" type="search" placeholder="הקלד עיר, רחוב או כתובת מלאה" />
-          <button class="primary-btn search-btn" id="search-btn">חיפוש</button>
+          <div class="search-wrap">
+            <input id="address-search" type="search" placeholder="הקלד עיר, רחוב או כתובת מלאה" autocomplete="off" />
+            <ul class="suggestions hidden" id="search-suggestions" role="listbox" aria-label="הצעות חיפוש"></ul>
+          </div>
+          <button class="primary-btn search-btn" id="search-btn" type="button">חיפוש</button>
         </section>
 
         <section class="recent-block" aria-labelledby="recent-title">
           <h3 id="recent-title">חיפושים אחרונים</h3>
-          <div class="recent-list">
-            <button class="recent-item" data-query="הרצל 12 נתניה">הרצל 12, נתניה</button>
-            <button class="recent-item" data-query="מרכז נתניה">מרכז נתניה</button>
-            <button class="recent-item" data-query="קיבוץ געש">קיבוץ געש</button>
-          </div>
+          <div class="recent-list" id="recent-list"></div>
+          <p class="empty-state hidden" id="recent-empty">עדיין לא ביצעת חיפושים</p>
         </section>
       </main>
 
@@ -77,28 +88,41 @@
             <p>מסך תוצאה</p>
             <h2 id="result-title">קו מתאים למשלוח</h2>
           </div>
+          <button class="icon-btn logout-btn" type="button" aria-label="יציאה">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M10 17l-1.4-1.4L11.2 13H3v-2h8.2L8.6 8.4 10 7l5 5z" />
+              <path d="M13 3h7v18h-7v-2h5V5h-5z" />
+            </svg>
+          </button>
         </header>
 
-        <section class="result-card card line-27">
+        <section class="result-card card" id="result-card">
           <p class="result-label">קו חלוקה</p>
-          <strong class="line-number">27</strong>
+          <strong class="line-number" id="result-line-number">—</strong>
           <div class="result-details">
             <div>
               <span>אזור חלוקה</span>
-              <b>מרכז נתניה</b>
+              <b id="result-area">—</b>
             </div>
             <div>
               <span>עיר</span>
-              <b>נתניה</b>
+              <b id="result-city">—</b>
             </div>
             <div>
               <span>הערות נוספות</span>
-              <b>למיין לעגלה כחולה, יציאה 14:30</b>
+              <b id="result-notes">—</b>
             </div>
           </div>
         </section>
 
-        <button class="primary-btn full-width" id="new-search">חיפוש חדש</button>
+        <div class="error-banner hidden" id="result-not-found" role="alert" aria-live="assertive">
+          לא נמצא קו מתאים לכתובת. נסה ניסוח אחר או פנה למנהל.
+        </div>
+
+        <div class="result-actions">
+          <button class="text-btn" id="back-to-search" type="button">חזרה לחיפוש</button>
+          <button class="primary-btn full-width" id="new-search" type="button">חיפוש חדש</button>
+        </div>
       </main>
 
       <main class="screen" id="history-screen" aria-labelledby="history-title">
@@ -107,22 +131,16 @@
             <p>היסטוריה</p>
             <h2 id="history-title">חיפושים שבוצעו</h2>
           </div>
+          <button class="icon-btn logout-btn" type="button" aria-label="יציאה">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M10 17l-1.4-1.4L11.2 13H3v-2h8.2L8.6 8.4 10 7l5 5z" />
+              <path d="M13 3h7v18h-7v-2h5V5h-5z" />
+            </svg>
+          </button>
         </header>
 
-        <section class="history-list">
-          <article class="card history-item">
-            <strong>הרצל 12, נתניה</strong>
-            <span>קו 27 · מרכז נתניה</span>
-          </article>
-          <article class="card history-item">
-            <strong>קיבוץ געש</strong>
-            <span>קו 8 · שרון דרומי</span>
-          </article>
-          <article class="card history-item">
-            <strong>רחוב האורן, חדרה</strong>
-            <span>קו 31 · חדרה צפון</span>
-          </article>
-        </section>
+        <section class="history-list" id="history-list"></section>
+        <p class="empty-state hidden" id="history-empty">עדיין לא ביצעת חיפושים</p>
       </main>
 
       <main class="screen" id="admin-screen" aria-labelledby="admin-title">
@@ -131,88 +149,62 @@
             <p>מסך ניהול</p>
             <h2 id="admin-title">ניהול מערכת</h2>
           </div>
+          <button class="icon-btn logout-btn" type="button" aria-label="יציאה">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M10 17l-1.4-1.4L11.2 13H3v-2h8.2L8.6 8.4 10 7l5 5z" />
+              <path d="M13 3h7v18h-7v-2h5V5h-5z" />
+            </svg>
+          </button>
         </header>
 
         <section class="admin-search">
-          <input type="search" placeholder="חיפוש מהיר בתוך רשימות" aria-label="חיפוש מהיר בתוך רשימות" />
+          <input type="search" id="admin-filter" placeholder="חיפוש מהיר בתוך רשימות" aria-label="חיפוש מהיר בתוך רשימות" />
         </section>
 
         <section class="admin-grid">
           <article class="card admin-card">
             <div class="card-heading">
               <h3>ניהול עובדים</h3>
-              <button class="small-btn">הוסף</button>
             </div>
             <label for="new-worker">הוספת עובד לפי מספר טלפון</label>
             <div class="inline-action">
               <input id="new-worker" type="tel" placeholder="050-0000000" />
-              <button>+</button>
+              <button id="add-worker-btn" type="button" aria-label="הוסף עובד">+</button>
             </div>
-            <div class="list-row">
-              <span>052-4457788</span>
-              <select aria-label="הרשאת עובד">
-                <option>עובד</option>
-                <option>מנהל</option>
-                <option>אדמין</option>
-              </select>
-              <button class="danger-btn">הסר</button>
-            </div>
-            <div class="list-row">
-              <span>054-7710020</span>
-              <select aria-label="הרשאת מנהל">
-                <option>מנהל</option>
-                <option>עובד</option>
-                <option>אדמין</option>
-              </select>
-              <button class="danger-btn">הסר</button>
-            </div>
+            <div id="workers-list"></div>
           </article>
 
           <article class="card admin-card">
             <div class="card-heading">
               <h3>ניהול קווי חלוקה</h3>
-              <button class="small-btn">קו חדש</button>
+              <button class="small-btn" id="add-line-btn" type="button">קו חדש</button>
             </div>
-            <div class="line-row">
-              <b>קו 27</b>
-              <span>נתניה · הרצל · סמילנסקי · מרכז העיר</span>
-              <div>
-                <button>עריכה</button>
-                <button class="danger-btn">מחיקה</button>
-              </div>
-            </div>
-            <div class="line-row">
-              <b>קו 8</b>
-              <span>געש · שפיים · רשפון · יקום</span>
-              <div>
-                <button>עריכה</button>
-                <button class="danger-btn">מחיקה</button>
-              </div>
-            </div>
-            <label for="assign-line">שיוך עיר, רחוב או קיבוץ לקו</label>
+            <div id="lines-list"></div>
+            <label for="assign-line-select">שיוך עיר, רחוב או קיבוץ לקו</label>
+            <select id="assign-line-select" aria-label="בחר קו לשיוך"></select>
             <div class="inline-action">
               <input id="assign-line" type="text" placeholder="לדוגמה: רחוב הרצל נתניה" />
-              <button>שייך</button>
+              <button id="assign-btn" type="button">שייך</button>
             </div>
           </article>
         </section>
       </main>
 
       <nav class="bottom-nav hidden" id="bottom-nav" aria-label="ניווט ראשי">
-        <button class="nav-item active" data-target="search-screen">
+        <button class="nav-item active" data-target="search-screen" type="button">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M10 4a6 6 0 104.5 10l4.2 4.2 1.4-1.4-4.2-4.2A6 6 0 0010 4zm0 2a4 4 0 110 8 4 4 0 010-8z" />
           </svg>
           <span>חיפוש</span>
         </button>
-        <button class="nav-item" data-target="history-screen">
+        <button class="nav-item" data-target="history-screen" type="button">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M13 3a9 9 0 109 9h-2a7 7 0 11-2.1-5H15v2h6V3h-2v2.5A8.9 8.9 0 0013 3z" />
             <path d="M12 7h2v5l4 2-.9 1.8-5.1-2.6z" />
           </svg>
           <span>היסטוריה</span>
         </button>
-        <button class="nav-item manager-only" data-target="admin-screen">
+        <button class="nav-item manager-only hidden" data-target="admin-screen" type="button">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M12 2l8 4v6c0 5-3.4 9.2-8 10-4.6-.8-8-5-8-10V6z" />
             <path d="M9 12l2 2 4-5 1.6 1.2-5.5 6.8-3.7-3.7z" />

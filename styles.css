@@ -72,6 +72,8 @@ label {
 
 .app-shell {
   width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
   min-height: 100vh;
   background: var(--bg);
 }
@@ -80,6 +82,10 @@ label {
   display: none;
   min-height: 100vh;
   padding: 18px 16px 98px;
+}
+
+#admin-screen.screen {
+  max-width: none;
 }
 
 .screen.active {
@@ -151,6 +157,16 @@ label {
   background: var(--primary-dark);
 }
 
+.primary-btn:disabled,
+button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.primary-btn.is-loading {
+  position: relative;
+}
+
 .text-btn {
   width: 100%;
   margin-top: 10px;
@@ -168,6 +184,28 @@ label {
   font-size: 1.08rem;
   font-weight: 900;
   text-align: center;
+}
+
+.status-banner {
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: 8px;
+  background: #ecfdf5;
+  border: 2px solid var(--success);
+  color: #064e3b;
+  font-size: 1.05rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.auth-hint,
+.session-summary {
+  display: block;
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.35;
 }
 
 .app-header {
@@ -211,6 +249,49 @@ label {
 .search-btn {
   min-height: 66px;
   font-size: 1.35rem;
+}
+
+.search-wrap {
+  position: relative;
+}
+
+.suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: #fff;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  z-index: 5;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.suggestions button {
+  width: 100%;
+  min-height: 46px;
+  background: transparent;
+  color: var(--text);
+  text-align: right;
+  padding: 0 12px;
+  font-weight: 700;
+}
+
+.suggestions button:hover,
+.suggestions button:focus-visible {
+  background: #e5edf7;
+}
+
+.empty-state {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-weight: 700;
+  text-align: center;
 }
 
 .recent-block {
@@ -289,6 +370,16 @@ label {
   min-height: 64px;
 }
 
+.result-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.result-actions .text-btn {
+  margin-top: 0;
+}
+
 .history-list,
 .admin-grid {
   display: grid;
@@ -312,6 +403,14 @@ label {
   margin-top: 5px;
   color: var(--muted);
   font-weight: 700;
+}
+
+.history-item {
+  cursor: pointer;
+}
+
+.history-item:active {
+  transform: scale(0.995);
 }
 
 .admin-search {
@@ -386,6 +485,10 @@ label {
   gap: 8px;
 }
 
+#assign-line-select {
+  margin-bottom: 10px;
+}
+
 .danger-btn {
   background: #fee2e2 !important;
   color: var(--danger) !important;
@@ -393,9 +496,10 @@ label {
 
 .bottom-nav {
   position: fixed;
-  right: 0;
+  left: 50%;
   bottom: 0;
-  width: 100%;
+  width: min(100%, 520px);
+  transform: translateX(-50%);
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1px;
@@ -404,6 +508,10 @@ label {
   border-top: 1px solid var(--border);
   box-shadow: 0 -10px 22px rgba(15, 23, 42, 0.12);
   z-index: 10;
+}
+
+.bottom-nav.nav-two-items {
+  grid-template-columns: repeat(2, 1fr);
 }
 
 .nav-item {
@@ -422,6 +530,10 @@ label {
 }
 
 @media (min-width: 980px) {
+  .app-shell {
+    max-width: 1100px;
+  }
+
   #admin-screen.screen {
     padding: 24px;
   }
@@ -434,5 +546,9 @@ label {
   #admin-screen .list-row {
     grid-template-columns: 1fr 130px 72px;
     align-items: center;
+  }
+
+  .bottom-nav {
+    width: min(100%, 1100px);
   }
 }
