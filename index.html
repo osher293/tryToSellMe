@@ -160,91 +160,101 @@
       </main>
 
       <main class="screen" id="admin-screen" aria-labelledby="admin-title">
-        <header class="app-header">
-          <div>
-            <p>מסך ניהול</p>
-            <h2 id="admin-title">ניהול מערכת</h2>
+        <div class="admin-content">
+          <header class="app-header admin-header">
+            <div>
+              <p>לוח ניהול</p>
+              <h2 id="admin-title">ניהול מערכת</h2>
+            </div>
+            <div class="admin-header-actions">
+              <input type="search" id="admin-filter" placeholder="חיפוש מהיר בתוך רשימות" aria-label="חיפוש מהיר בתוך רשימות" />
+              <button class="icon-btn logout-btn" type="button" aria-label="יציאה">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M10 17l-1.4-1.4L11.2 13H3v-2h8.2L8.6 8.4 10 7l5 5z" />
+                  <path d="M13 3h7v18h-7v-2h5V5h-5z" />
+                </svg>
+              </button>
+            </div>
+          </header>
+
+          <div class="admin-tabs" role="tablist">
+            <button class="admin-tab active" type="button" data-panel="workers-panel" role="tab" aria-selected="true">עובדים</button>
+            <button class="admin-tab" type="button" data-panel="lines-panel" role="tab" aria-selected="false">קווי חלוקה ורחובות</button>
           </div>
-          <button class="icon-btn logout-btn" type="button" aria-label="יציאה">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M10 17l-1.4-1.4L11.2 13H3v-2h8.2L8.6 8.4 10 7l5 5z" />
-              <path d="M13 3h7v18h-7v-2h5V5h-5z" />
-            </svg>
-          </button>
-        </header>
 
-        <section class="admin-search">
-          <input type="search" id="admin-filter" placeholder="חיפוש מהיר בתוך רשימות" aria-label="חיפוש מהיר בתוך רשימות" />
-        </section>
-
-        <section class="admin-grid">
-          <article class="card admin-card">
-            <div class="card-heading">
-              <h3>ניהול עובדים</h3>
-            </div>
-            <label for="new-worker">הוספת עובד לפי מספר טלפון</label>
-            <div class="inline-action">
-              <input id="new-worker" type="tel" placeholder="050-0000000" />
-              <button id="add-worker-btn" type="button" aria-label="הוסף עובד">+</button>
-            </div>
-            <div id="workers-list"></div>
-          </article>
-
-          <article class="card admin-card">
-            <div class="card-heading">
-              <h3>ניהול קווי חלוקה</h3>
-              <button class="small-btn" id="add-line-btn" type="button">קו חדש</button>
-            </div>
-            <div class="admin-subsection admin-subsection-first">
-              <div id="lines-list"></div>
-            </div>
-
-            <div class="admin-subsection">
-              <label for="assign-line-select">שיוך עיר, רחוב או קיבוץ לקו</label>
-              <select id="assign-line-select" aria-label="בחר קו לשיוך"></select>
+          <section class="admin-panel active" id="workers-panel">
+            <article class="card admin-card">
+              <div class="card-heading">
+                <h3>ניהול עובדים</h3>
+              </div>
+              <label for="new-worker">הוספת עובד לפי מספר טלפון</label>
               <div class="inline-action">
-                <input id="assign-line" type="text" placeholder="לדוגמה: רחוב הרצל נתניה" />
-                <button id="assign-btn" type="button">שייך</button>
+                <input id="new-worker" type="tel" placeholder="050-0000000" />
+                <button id="add-worker-btn" type="button" aria-label="הוסף עובד">+</button>
               </div>
-            </div>
+              <div id="workers-list"></div>
+            </article>
+          </section>
 
-            <div class="admin-subsection">
-              <label for="city-input">טעינת כל הרחובות של עיר מהמאגר</label>
-              <div class="inline-action">
-                <input id="city-input" type="text" placeholder="לדוגמה: נתניה" />
-                <button id="load-streets-btn" type="button">טען רחובות</button>
-              </div>
-              <div class="hidden" id="city-streets-block">
-                <label for="city-streets-textarea">רחובות שנמצאו (ניתן לערוך לפני שיוך)</label>
-                <textarea id="city-streets-textarea" rows="8"></textarea>
-                <button class="primary-btn full-width" id="save-city-streets-btn" type="button">שייך את כל הרחובות לקו</button>
-              </div>
-            </div>
-          </article>
+          <section class="admin-panel" id="lines-panel">
+            <div class="admin-grid">
+              <article class="card admin-card">
+                <div class="card-heading">
+                  <h3>ניהול קווי חלוקה</h3>
+                  <button class="small-btn" id="add-line-btn" type="button">קו חדש</button>
+                </div>
+                <div class="admin-subsection admin-subsection-first">
+                  <div id="lines-list"></div>
+                </div>
 
-          <article class="card admin-card">
-            <div class="card-heading">
-              <h3>מאגר רחובות לפי עיר (כל הארץ)</h3>
-            </div>
-            <p class="auth-hint">מקור: מרשם רחובות של רשות האוכלוסין וההגירה. ניתן לערוך כל עיר אם הרחובות שלה משתנים.</p>
+                <div class="admin-subsection">
+                  <label for="assign-line-select">שיוך עיר, רחוב או קיבוץ לקו</label>
+                  <select id="assign-line-select" aria-label="בחר קו לשיוך"></select>
+                  <div class="inline-action">
+                    <input id="assign-line" type="text" placeholder="לדוגמה: רחוב הרצל נתניה" />
+                    <button id="assign-btn" type="button">שייך</button>
+                  </div>
+                </div>
 
-            <div class="admin-subsection admin-subsection-first">
-              <label for="city-database-select">בחר עיר</label>
-              <select id="city-database-select" aria-label="בחר עיר מהמאגר"></select>
-              <label for="city-database-textarea">רחובות (ניתן לערוך)</label>
-              <textarea id="city-database-textarea" rows="10"></textarea>
-              <button class="primary-btn full-width" id="save-city-database-btn" type="button">שמור שינויים לעיר</button>
-            </div>
+                <div class="admin-subsection">
+                  <label for="city-input">טעינת כל הרחובות של עיר מהמאגר</label>
+                  <div class="inline-action">
+                    <input id="city-input" type="text" placeholder="לדוגמה: נתניה" />
+                    <button id="load-streets-btn" type="button">טען רחובות</button>
+                  </div>
+                  <div class="hidden" id="city-streets-block">
+                    <label for="city-streets-textarea">רחובות שנמצאו (ניתן לערוך לפני שיוך)</label>
+                    <textarea id="city-streets-textarea" rows="8"></textarea>
+                    <button class="primary-btn full-width" id="save-city-streets-btn" type="button">שייך את כל הרחובות לקו</button>
+                  </div>
+                </div>
+              </article>
 
-            <div class="admin-subsection">
-              <label for="new-city-input">הוספת עיר שלא נמצאת ברשימה</label>
-              <div class="inline-action">
-                <input id="new-city-input" type="text" placeholder="שם עיר חדש" />
-                <button id="add-city-btn" type="button">הוסף</button>
-              </div>
+              <article class="card admin-card">
+                <div class="card-heading">
+                  <h3>מאגר רחובות לפי עיר (כל הארץ)</h3>
+                </div>
+                <p class="auth-hint">מקור: מרשם רחובות של רשות האוכלוסין וההגירה. ניתן לערוך כל עיר אם הרחובות שלה משתנים.</p>
+
+                <div class="admin-subsection admin-subsection-first">
+                  <label for="city-database-select">בחר עיר</label>
+                  <select id="city-database-select" aria-label="בחר עיר מהמאגר"></select>
+                  <label for="city-database-textarea">רחובות (ניתן לערוך)</label>
+                  <textarea id="city-database-textarea" rows="10"></textarea>
+                  <button class="primary-btn full-width" id="save-city-database-btn" type="button">שמור שינויים לעיר</button>
+                </div>
+
+                <div class="admin-subsection">
+                  <label for="new-city-input">הוספת עיר שלא נמצאת ברשימה</label>
+                  <div class="inline-action">
+                    <input id="new-city-input" type="text" placeholder="שם עיר חדש" />
+                    <button id="add-city-btn" type="button">הוסף</button>
+                  </div>
+                </div>
+              </article>
             </div>
-          </article>
-        </section>
+          </section>
+        </div>
       </main>
 
       <nav class="bottom-nav hidden" id="bottom-nav" aria-label="ניווט ראשי">

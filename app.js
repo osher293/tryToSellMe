@@ -556,6 +556,8 @@ function showScreen(screenId) {
     screen.classList.toggle("active", screen.id === screenId);
   });
 
+  document.querySelector(".app-shell").classList.toggle("app-shell--wide", screenId === "admin-screen");
+
   const isLoggedInArea = screenId !== "login-screen";
   bottomNav.classList.toggle("hidden", !isLoggedInArea);
 
@@ -1396,6 +1398,19 @@ addressSearch.addEventListener("focus", () => {
 navItems.forEach((item) => {
   item.addEventListener("click", () => {
     showScreen(item.dataset.target);
+  });
+});
+
+document.querySelectorAll(".admin-tab").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".admin-tab").forEach((item) => {
+      item.classList.toggle("active", item === tab);
+      item.setAttribute("aria-selected", String(item === tab));
+    });
+
+    document.querySelectorAll(".admin-panel").forEach((panel) => {
+      panel.classList.toggle("active", panel.id === tab.dataset.panel);
+    });
   });
 });
 
