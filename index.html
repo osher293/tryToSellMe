@@ -211,7 +211,7 @@
                   <label for="assign-line-select">שיוך עיר, רחוב או קיבוץ לקו</label>
                   <select id="assign-line-select" aria-label="בחר קו לשיוך"></select>
                   <div class="inline-action">
-                    <input id="assign-line" type="text" placeholder="לדוגמה: רחוב הרצל נתניה" />
+                    <input id="assign-line" type="text" placeholder="לדוגמה: רחוב הרצל נתניה, רחוב ויצמן נתניה" />
                     <button id="assign-btn" type="button">שייך</button>
                   </div>
                 </div>
@@ -242,6 +242,7 @@
                   <label for="city-database-textarea">רחובות (ניתן לערוך)</label>
                   <textarea id="city-database-textarea" rows="10"></textarea>
                   <button class="primary-btn full-width" id="save-city-database-btn" type="button">שמור שינויים לעיר</button>
+                  <button class="text-btn full-width" id="reset-city-database-btn" type="button">אפס לרשימה המקורית מהמאגר הממשלתי</button>
                 </div>
 
                 <div class="admin-subsection">
@@ -279,6 +280,18 @@
           <span>ניהול</span>
         </button>
       </nav>
+    </div>
+
+    <div class="modal-overlay hidden" id="line-streets-modal">
+      <div class="card modal-card">
+        <div class="card-heading">
+          <h3 id="line-streets-modal-title">רחובות משוייכים לקו</h3>
+          <button class="icon-btn" id="line-streets-modal-close" type="button" aria-label="סגור">×</button>
+        </div>
+        <p class="auth-hint">כל הכתובות המשוייכות לקו זה (עיר - רחוב). מחק שורה כדי להסיר שיוך. אפשר גם להוסיף שורה חדשה בפורמט "עיר - רחוב1, רחוב2, רחוב3" כדי לשייך כמה רחובות בעיר אחת בבת אחת. לחץ שמור בסוף.</p>
+        <textarea id="line-streets-modal-textarea" rows="16"></textarea>
+        <button class="primary-btn full-width" id="line-streets-modal-save" type="button">שמור שינויים</button>
+      </div>
     </div>
 
     <script src="app.js"></script>

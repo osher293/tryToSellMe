@@ -62,6 +62,7 @@ async function sha256Hex(text) {
 let currentSession = readStore(STORAGE_KEYS.session, null);
 let pendingPhone = "";
 let suggestionHideTimer = null;
+let currentLineStreetsModalLineId = null;
 
 function readStore(key, fallback) {
   const raw = localStorage.getItem(key);
@@ -845,6 +846,12 @@ function renderLines(filter = "") {
 
     const actions = document.createElement("div");
     actions.className = "line-row-actions";
+
+    const streetsBtn = document.createElement("button");
+    streetsBtn.type = "button";
+    streetsBtn.textContent = "רחובות";
+    streetsBtn.addEventListener("click", () => openLineStreetsModal(line));
+
     const editBtn = document.createElement("button");
     editBtn.type = "button";
     editBtn.textContent = "עריכה";
@@ -856,7 +863,7 @@ function renderLines(filter = "") {
     deleteBtn.textContent = "מחיקה";
     deleteBtn.addEventListener("click", () => deleteLine(line));
 
-    actions.append(editBtn, deleteBtn);
+    actions.append(streetsBtn, editBtn, deleteBtn);
     row.append(info, actions);
     linesList.appendChild(row);
   });
@@ -900,13 +907,111 @@ function deleteLine(line) {
   renderAdmin();
 }
 
+function formatAssignmentLine(assignment) {
+  if (assignment.street) return `${assignment.city} - ${assignment.street}`;
+  return assignment.query;
+}
+
+function openLineStreetsModal(line) {
+  currentLineStreetsModalLineId = line.id;
+  document.getElementById("line-streets-modal-title").textContent = `רחובות משוייכים לקו ${line.number}`;
+
+  const assignments = dataRepository.getAllAssignments().filter((item) => item.line_id === line.id);
+  document.getElementById("line-streets-modal-textarea").value = assignments.map(formatAssignmentLine).join("\n");
+  document.getElementById("line-streets-modal").classList.remove("hidden");
+}
+
+function closeLineStreetsModal() {
+  document.getElementById("line-streets-modal").classList.add("hidden");
+  currentLineStreetsModalLineId = null;
+}
+
+function saveLineStreetsModal() {
+  if (!currentLineStreetsModalLineId) return;
+
+  const lineId = currentLineStreetsModalLineId;
+  const rawLines = document
+    .getElementById("line-streets-modal-textarea")
+    .value.split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const existingByFormat = new Map(
+    dataRepository
+      .getAllAssignments()
+      .filter((item) => item.line_id === lineId)
+      .map((item) => [formatAssignmentLine(item), item])
+  );
+
+  const finalEntries = [];
+  const usedKeys = new Set();
+
+  const addEntry = (key, buildEntry) => {
+    if (usedKeys.has(key)) return;
+    usedKeys.add(key);
+    finalEntries.push(existingByFormat.get(key) || buildEntry());
+  };
+
+  rawLines.forEach((rawLine) => {
+    const dashIndex = rawLine.indexOf(" - ");
+
+    if (dashIndex !== -1) {
+      const city = rawLine.slice(0, dashIndex).trim();
+      const streets = rawLine
+        .slice(dashIndex + 3)
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      streets.forEach((street) => {
+        addEntry(`${city} - ${street}`, () => ({
+          id: createId("asgn"),
+          line_id: lineId,
+          query: `${street} ${city}`,
+          city,
+          street,
+          organization_id: currentSession.organization_id,
+        }));
+      });
+      return;
+    }
+
+    rawLine
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .forEach((query) => {
+        addEntry(query, () => ({
+          id: createId("asgn"),
+          line_id: lineId,
+          query,
+          city: query.split(" ").pop() || query,
+          organization_id: currentSession.organization_id,
+        }));
+      });
+  });
+
+  const otherAssignments = dataRepository.getAllAssignments().filter((item) => item.line_id !== lineId);
+  dataRepository.saveAssignments([...otherAssignments, ...finalEntries]);
+  closeLineStreetsModal();
+  renderAdmin();
+  window.alert("השינויים נשמרו");
+}
+
 function addLine() {
-  const numberInput = window.prompt("מספר קו:", "");
+  const numberInput = window.prompt("מספר קו (אפשר גם עם אות, למשל 18א):", "");
   if (numberInput === null) return;
 
-  const number = Number(numberInput);
-  if (!Number.isFinite(number) || number <= 0) {
+  const number = numberInput.trim();
+  if (!number) {
     window.alert("הזן מספר קו תקין");
+    return;
+  }
+
+  const existingLines = dataRepository.getLines(currentSession.organization_id);
+  const normalizedNumber = normalizeQuery(number);
+  if (existingLines.some((item) => normalizeQuery(String(item.number)) === normalizedNumber)) {
+    window.alert(`קו ${number} כבר קיים. אם זה קו נפרד לאזור אחר, תן לו סיומת שונה (למשל 18א, 18ב)`);
     return;
   }
 
@@ -965,28 +1070,32 @@ function addWorker() {
 }
 
 function assignAddress() {
-  const query = document.getElementById("assign-line").value.trim();
+  const rawInput = document.getElementById("assign-line").value.trim();
   const lineId = assignLineSelect.value;
 
-  if (!query || !lineId) {
+  const queries = rawInput
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (!queries.length || !lineId) {
     window.alert("בחר קו והזן כתובת לשיוך");
     return;
   }
 
-  dataRepository.saveAssignments([
-    ...dataRepository.getAllAssignments(),
-    {
-      id: createId("asgn"),
-      line_id: lineId,
-      query,
-      city: query.split(" ").pop() || query,
-      organization_id: currentSession.organization_id,
-    },
-  ]);
+  const newAssignments = queries.map((query) => ({
+    id: createId("asgn"),
+    line_id: lineId,
+    query,
+    city: query.split(" ").pop() || query,
+    organization_id: currentSession.organization_id,
+  }));
+
+  dataRepository.saveAssignments([...dataRepository.getAllAssignments(), ...newAssignments]);
 
   document.getElementById("assign-line").value = "";
   renderAdmin();
-  window.alert("הכתובת שויכה בהצלחה");
+  window.alert(queries.length > 1 ? `${queries.length} כתובות שויכו בהצלחה` : "הכתובת שויכה בהצלחה");
 }
 
 let cityStreetsData = null;
@@ -1142,6 +1251,29 @@ function saveCityDatabaseStreets() {
 
   saveCityStreetsOverride(city, streets);
   window.alert(`הרחובות של ${city} נשמרו`);
+}
+
+function resetCityDatabaseStreets() {
+  const select = document.getElementById("city-database-select");
+  const city = select.value;
+
+  if (!city) return;
+
+  const isInOriginalDatabase = Boolean(cityStreetsData && cityStreetsData[city]);
+  if (!isInOriginalDatabase) {
+    window.alert("העיר הזו אינה קיימת במאגר המקורי, ולכן אין אליה רשימה לאפס. אפשר רק לערוך ולשמור.");
+    return;
+  }
+
+  if (!window.confirm(`לאפס את הרחובות של ${city} לרשימה המקורית מהמאגר הממשלתי? כל שינוי שעשית בעיר זו יימחק.`)) {
+    return;
+  }
+
+  const overrides = readStore(STORAGE_KEYS.cityStreetOverrides, {});
+  delete overrides[city];
+  writeStore(STORAGE_KEYS.cityStreetOverrides, overrides);
+  loadSelectedCityStreets();
+  window.alert(`הרחובות של ${city} אופסו לרשימה המקורית`);
 }
 
 function addNewCityToDatabase() {
@@ -1429,7 +1561,13 @@ document.getElementById("load-streets-btn").addEventListener("click", loadCitySt
 document.getElementById("save-city-streets-btn").addEventListener("click", saveCityStreets);
 document.getElementById("city-database-select").addEventListener("change", loadSelectedCityStreets);
 document.getElementById("save-city-database-btn").addEventListener("click", saveCityDatabaseStreets);
+document.getElementById("reset-city-database-btn").addEventListener("click", resetCityDatabaseStreets);
 document.getElementById("add-city-btn").addEventListener("click", addNewCityToDatabase);
+document.getElementById("line-streets-modal-save").addEventListener("click", saveLineStreetsModal);
+document.getElementById("line-streets-modal-close").addEventListener("click", closeLineStreetsModal);
+document.getElementById("line-streets-modal").addEventListener("click", (event) => {
+  if (event.target.id === "line-streets-modal") closeLineStreetsModal();
+});
 adminFilter.addEventListener("input", () => renderAdmin());
 
 bindEnterKey(document.getElementById("phone"), () => document.getElementById("send-code").click());
