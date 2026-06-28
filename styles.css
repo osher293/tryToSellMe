@@ -720,7 +720,7 @@ button:disabled {
     padding: 22px;
   }
 
-  #admin-screen #lines-list {
+  #admin-screen #lines-list.scrollable {
     max-height: 460px;
     overflow-y: auto;
   }

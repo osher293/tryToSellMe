@@ -63,6 +63,7 @@ let currentSession = readStore(STORAGE_KEYS.session, null);
 let pendingPhone = "";
 let suggestionHideTimer = null;
 let currentLineStreetsModalLineId = null;
+let currentEditLineId = null;
 
 function readStore(key, fallback) {
   const raw = localStorage.getItem(key);
@@ -855,7 +856,7 @@ function renderLines(filter = "") {
     const editBtn = document.createElement("button");
     editBtn.type = "button";
     editBtn.textContent = "עריכה";
-    editBtn.addEventListener("click", () => editLine(line));
+    editBtn.addEventListener("click", () => openEditLineModal(line));
 
     const deleteBtn = document.createElement("button");
     deleteBtn.type = "button";
@@ -867,6 +868,8 @@ function renderLines(filter = "") {
     row.append(info, actions);
     linesList.appendChild(row);
   });
+
+  linesList.classList.toggle("scrollable", linesList.children.length > 6);
 }
 
 function renderAdmin() {
@@ -875,27 +878,44 @@ function renderAdmin() {
   renderCityDatabaseSelect();
 }
 
-function editLine(line) {
-  const name = window.prompt("שם אזור חלוקה:", line.name);
-  if (name === null) return;
+function openEditLineModal(line) {
+  currentEditLineId = line.id;
+  document.getElementById("edit-line-modal-title").textContent = `עריכת קו ${line.number}`;
+  document.getElementById("edit-line-name").value = line.name;
+  document.getElementById("edit-line-areas").value = line.areas.join(", ");
+  document.getElementById("edit-line-notes").value = line.notes || "";
+  document.getElementById("edit-line-modal").classList.remove("hidden");
+  document.getElementById("edit-line-name").focus();
+}
 
-  const areasInput = window.prompt("רחובות/אזורים (מופרדים בפסיק):", line.areas.join(", "));
-  if (areasInput === null) return;
+function closeEditLineModal() {
+  document.getElementById("edit-line-modal").classList.add("hidden");
+  currentEditLineId = null;
+}
 
-  const notes = window.prompt("הערות:", line.notes || "");
-  if (notes === null) return;
+function saveEditLineModal() {
+  if (!currentEditLineId) return;
+
+  const name = document.getElementById("edit-line-name").value.trim();
+  if (!name) {
+    window.alert("הזן שם אזור חלוקה");
+    return;
+  }
 
   const allLines = dataRepository.getAllLines();
-  const target = allLines.find((item) => item.id === line.id);
+  const target = allLines.find((item) => item.id === currentEditLineId);
   if (!target) return;
 
-  target.name = name.trim() || target.name;
-  target.areas = areasInput
-    .split(",")
+  target.name = name;
+  target.areas = document
+    .getElementById("edit-line-areas")
+    .value.split(",")
     .map((item) => item.trim())
     .filter(Boolean);
-  target.notes = notes.trim();
+  target.notes = document.getElementById("edit-line-notes").value.trim();
+
   dataRepository.saveLines(allLines);
+  closeEditLineModal();
   renderAdmin();
 }
 
@@ -1580,6 +1600,11 @@ document.getElementById("line-streets-modal-save").addEventListener("click", sav
 document.getElementById("line-streets-modal-close").addEventListener("click", closeLineStreetsModal);
 document.getElementById("line-streets-modal").addEventListener("click", (event) => {
   if (event.target.id === "line-streets-modal") closeLineStreetsModal();
+});
+document.getElementById("edit-line-modal-save").addEventListener("click", saveEditLineModal);
+document.getElementById("edit-line-modal-close").addEventListener("click", closeEditLineModal);
+document.getElementById("edit-line-modal").addEventListener("click", (event) => {
+  if (event.target.id === "edit-line-modal") closeEditLineModal();
 });
 adminFilter.addEventListener("input", () => renderAdmin());
 
