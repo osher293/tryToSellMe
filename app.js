@@ -2,10 +2,11 @@ const screens = document.querySelectorAll(".screen");
 const bottomNav = document.getElementById("bottom-nav");
 const navItems = document.querySelectorAll(".nav-item");
 const phoneStep = document.getElementById("phone-step");
-const otpStep = document.getElementById("otp-step");
+const activateStep = document.getElementById("activate-step");
+const setPasswordStep = document.getElementById("set-password-step");
+const passwordStep = document.getElementById("password-step");
 const accessError = document.getElementById("access-error");
 const authStatus = document.getElementById("auth-status");
-const otpHint = document.getElementById("otp-hint");
 const addressSearch = document.getElementById("address-search");
 const sessionSummary = document.getElementById("session-summary");
 const searchSuggestions = document.getElementById("search-suggestions");
@@ -28,11 +29,11 @@ const managerNavItem = document.querySelector(".nav-item.manager-only");
 const STORAGE_KEYS = {
   users: "deliveryLineUsers",
   organizations: "deliveryLineOrganizations",
-  otpRequests: "deliveryLineOtpRequests",
   session: "deliveryLineSession",
   lines: "deliveryLineLines",
   assignments: "deliveryLineAssignments",
   history: "deliveryLineHistory",
+  cityStreetOverrides: "deliveryLineCityStreetOverrides",
 };
 
 const ROLE_LABELS = {
@@ -42,10 +43,21 @@ const ROLE_LABELS = {
 };
 
 const MANAGER_ROLES = new Set(["admin", "manager"]);
-const OTP_TTL_MS = 5 * 60 * 1000;
-const MAX_OTP_ATTEMPTS = 5;
 const PROTECTED_SCREENS = new Set(["search-screen", "result-screen", "history-screen", "admin-screen"]);
-const IS_DEMO = location.hostname === "localhost" || location.hostname === "127.0.0.1";
+
+// חשבון אדמין-התאוששות: מבטיח כניסה תמיד למספר הזה, גם אם ה-localStorage נמצא במצב לא תקין.
+// הסיסמה לא נשמרת כטקסט גלוי בקוד - רק טביעת SHA-256 שלה, ונבדקת בהשוואת hash.
+const RECOVERY_ADMIN_PHONE = normalizePhone("0506411890");
+const RECOVERY_ADMIN_PASSWORD_HASH =
+  "617116600cf1e7d7f236687d603986df4796345088818ea7728df26abb4ac337";
+
+async function sha256Hex(text) {
+  const data = new TextEncoder().encode(text);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
 
 let currentSession = readStore(STORAGE_KEYS.session, null);
 let pendingPhone = "";
@@ -74,6 +86,16 @@ function formatPhone(phone) {
     return `${digits.slice(0, 3)}-${digits.slice(3)}`;
   }
   return phone;
+}
+
+function generateActivationCode() {
+  const bytes = new Uint32Array(1);
+  crypto.getRandomValues(bytes);
+  return String((bytes[0] % 900000) + 100000);
+}
+
+function passwordLengthForRole(role) {
+  return role === "worker" ? 4 : 7;
 }
 
 function normalizeQuery(query) {
@@ -340,67 +362,6 @@ const searchService = {
   },
 };
 
-const otpService = {
-  getRequests() {
-    return readStore(STORAGE_KEYS.otpRequests, {});
-  },
-  saveRequests(requests) {
-    writeStore(STORAGE_KEYS.otpRequests, requests);
-  },
-  generateCode() {
-    const bytes = new Uint32Array(1);
-    crypto.getRandomValues(bytes);
-    return String((bytes[0] % 900000) + 100000);
-  },
-  sendSms(phone, code) {
-    console.info(`OTP for ${phone}: ${code}`);
-  },
-  start(phone) {
-    const code = this.generateCode();
-    const requests = this.getRequests();
-
-    requests[phone] = {
-      code,
-      expires_at: Date.now() + OTP_TTL_MS,
-      attempts: 0,
-      verified: false,
-    };
-
-    this.saveRequests(requests);
-    this.sendSms(phone, code);
-    return { expires_in_seconds: OTP_TTL_MS / 1000, demo_code: code };
-  },
-  verify(phone, code) {
-    const requests = this.getRequests();
-    const request = requests[phone];
-
-    if (!request) {
-      return { ok: false, reason: "לא נמצא קוד אימות פעיל" };
-    }
-
-    if (Date.now() > request.expires_at) {
-      delete requests[phone];
-      this.saveRequests(requests);
-      return { ok: false, reason: "קוד האימות פג תוקף. שלח קוד חדש" };
-    }
-
-    if (request.attempts >= MAX_OTP_ATTEMPTS) {
-      return { ok: false, reason: "בוצעו יותר מדי ניסיונות. שלח קוד חדש" };
-    }
-
-    request.attempts += 1;
-
-    if (request.code !== code) {
-      this.saveRequests(requests);
-      return { ok: false, reason: "קוד אימות שגוי" };
-    }
-
-    request.verified = true;
-    this.saveRequests(requests);
-    return { ok: true };
-  },
-};
-
 const organizationBootstrap = {
   createFirstOrganization(phone) {
     const organization = {
@@ -414,6 +375,8 @@ const organizationBootstrap = {
       phone,
       role: "admin",
       organization_id: organization.id,
+      activation_code: null,
+      password: null,
     };
 
     organization.created_by = user.id;
@@ -424,38 +387,73 @@ const organizationBootstrap = {
   },
 };
 
+function ensureRecoveryAdmin(phone) {
+  const existing = authRepository.findUserByPhone(phone);
+  if (existing) return existing;
+
+  const organizations = authRepository.getOrganizations();
+  let organization = organizations[0];
+
+  if (!organization) {
+    organization = { id: createId("org"), name: "ארגון ראשי", created_by: null };
+    authRepository.saveOrganizations([organization]);
+  }
+
+  const user = {
+    id: createId("user"),
+    phone,
+    role: "admin",
+    organization_id: organization.id,
+    activation_code: null,
+    password: null,
+  };
+
+  authRepository.saveUsers([...authRepository.getUsers(), user]);
+  seedOrgDataIfNeeded(organization.id);
+
+  if (!organization.created_by) {
+    organization.created_by = user.id;
+    authRepository.saveOrganizations(
+      authRepository.getOrganizations().map((item) => (item.id === organization.id ? organization : item))
+    );
+  }
+
+  return user;
+}
+
 const authService = {
-  requestOtp(phoneInput) {
+  startLogin(phoneInput) {
     const phone = normalizePhone(phoneInput);
 
     if (phone.length < 9) {
       return { ok: false, reason: "הזן מספר טלפון תקין" };
     }
 
-    return { ok: true, phone, otp: otpService.start(phone) };
-  },
-  verifyOtp(phone, code) {
-    const otpResult = otpService.verify(phone, code);
-
-    if (!otpResult.ok) {
-      return otpResult;
+    if (phone === RECOVERY_ADMIN_PHONE) {
+      return { ok: true, phone, mode: "password" };
     }
-
-    let user = authRepository.findUserByPhone(phone);
-    let organization = null;
-    let bootstrapped = false;
 
     if (!authRepository.hasUsers()) {
-      const result = organizationBootstrap.createFirstOrganization(phone);
-      user = result.user;
-      organization = result.organization;
-      bootstrapped = true;
+      return { ok: true, phone, mode: "bootstrap" };
     }
+
+    const user = authRepository.findUserByPhone(phone);
 
     if (!user) {
       return { ok: false, reason: "אין לך גישה למערכת, פנה למנהל" };
     }
 
+    if (user.password) {
+      return { ok: true, phone, mode: "password" };
+    }
+
+    if (user.activation_code) {
+      return { ok: true, phone, mode: "activate" };
+    }
+
+    return { ok: true, phone, mode: "set-password", role: user.role };
+  },
+  completeLoginForUser(user) {
     const session = {
       token: createSessionToken(),
       user_id: user.id,
@@ -466,7 +464,74 @@ const authService = {
     };
 
     authRepository.saveSession(session);
-    return { ok: true, session, user, organization, bootstrapped };
+    return { ok: true, session };
+  },
+  beginBootstrap(phone) {
+    const result = organizationBootstrap.createFirstOrganization(phone);
+    return { ok: true, role: result.user.role };
+  },
+  verifyActivationCode(phone, code) {
+    const users = authRepository.getUsers();
+    const user = users.find((item) => item.phone === phone);
+
+    if (!user) {
+      return { ok: false, reason: "אין לך גישה למערכת, פנה למנהל" };
+    }
+
+    if (!user.activation_code || user.activation_code !== code.trim()) {
+      return { ok: false, reason: "קוד הפעלה שגוי" };
+    }
+
+    user.activation_code = null;
+    authRepository.saveUsers(users);
+    return { ok: true, role: user.role };
+  },
+  setPassword(phone, password, confirmPassword) {
+    const users = authRepository.getUsers();
+    const user = users.find((item) => item.phone === phone);
+
+    if (!user) {
+      return { ok: false, reason: "אין לך גישה למערכת, פנה למנהל" };
+    }
+
+    const requiredLength = passwordLengthForRole(user.role);
+
+    if (password !== confirmPassword) {
+      return { ok: false, reason: "הסיסמאות אינן תואמות" };
+    }
+
+    if (!/^\d+$/.test(password) || password.length !== requiredLength) {
+      return { ok: false, reason: `הסיסמה צריכה להיות בת ${requiredLength} ספרות` };
+    }
+
+    user.password = password;
+    authRepository.saveUsers(users);
+    return this.completeLoginForUser(user);
+  },
+  async verifyPassword(phone, password) {
+    if (phone === RECOVERY_ADMIN_PHONE) {
+      const hash = await sha256Hex(password.trim());
+
+      if (hash !== RECOVERY_ADMIN_PASSWORD_HASH) {
+        return { ok: false, reason: "סיסמה שגויה" };
+      }
+
+      const user = ensureRecoveryAdmin(phone);
+      user.role = "admin";
+      user.password = password.trim();
+      authRepository.saveUsers(
+        authRepository.getUsers().map((item) => (item.id === user.id ? user : item))
+      );
+      return this.completeLoginForUser(user);
+    }
+
+    const user = authRepository.findUserByPhone(phone);
+
+    if (!user || user.password !== password.trim()) {
+      return { ok: false, reason: "סיסמה שגויה" };
+    }
+
+    return this.completeLoginForUser(user);
   },
 };
 
@@ -568,7 +633,14 @@ function renderHistory() {
   history.forEach((item) => {
     const article = document.createElement("article");
     article.className = "card history-item";
-    article.innerHTML = `<strong>${item.query}</strong><span>קו ${item.line_number} · ${item.line_name}</span>`;
+
+    const title = document.createElement("strong");
+    title.textContent = item.query;
+
+    const meta = document.createElement("span");
+    meta.textContent = `קו ${item.line_number} · ${item.line_name}`;
+
+    article.append(title, meta);
     article.addEventListener("click", () => runSearch(item.query));
     historyList.appendChild(article);
   });
@@ -670,8 +742,23 @@ function renderWorkers(filter = "") {
     row.className = "list-row";
     row.dataset.filterText = haystack;
 
+    const phoneCell = document.createElement("div");
+    phoneCell.className = "list-row-phone";
+
     const phoneSpan = document.createElement("span");
     phoneSpan.textContent = phoneLabel;
+    phoneCell.appendChild(phoneSpan);
+
+    if (user.activation_code) {
+      const codeBtn = document.createElement("button");
+      codeBtn.type = "button";
+      codeBtn.className = "text-btn code-btn";
+      codeBtn.textContent = "הצג קוד הפעלה";
+      codeBtn.addEventListener("click", () => {
+        window.alert(`קוד הפעלה חד-פעמי ל-${phoneLabel}:\n${user.activation_code}\n\nמסור אותו לעובד לכניסה הראשונה.`);
+      });
+      phoneCell.appendChild(codeBtn);
+    }
 
     const roleSelect = document.createElement("select");
     roleSelect.setAttribute("aria-label", `הרשאת ${phoneLabel}`);
@@ -714,7 +801,7 @@ function renderWorkers(filter = "") {
       renderWorkers(adminFilter.value);
     });
 
-    row.append(phoneSpan, roleSelect, removeBtn);
+    row.append(phoneCell, roleSelect, removeBtn);
     workersList.appendChild(row);
   });
 }
@@ -768,6 +855,7 @@ function renderLines(filter = "") {
 function renderAdmin() {
   renderWorkers(adminFilter.value);
   renderLines(adminFilter.value);
+  renderCityDatabaseSelect();
 }
 
 function editLine(line) {
@@ -847,6 +935,8 @@ function addWorker() {
     return;
   }
 
+  const code = generateActivationCode();
+
   authRepository.saveUsers([
     ...authRepository.getUsers(),
     {
@@ -854,11 +944,14 @@ function addWorker() {
       phone,
       role: "worker",
       organization_id: currentSession.organization_id,
+      activation_code: code,
+      password: null,
     },
   ]);
 
   document.getElementById("new-worker").value = "";
   renderWorkers(adminFilter.value);
+  window.alert(`העובד נוסף.\nקוד הפעלה חד-פעמי: ${code}\nמסור אותו לעובד לכניסה הראשונה.`);
 }
 
 function assignAddress() {
@@ -886,6 +979,180 @@ function assignAddress() {
   window.alert("הכתובת שויכה בהצלחה");
 }
 
+let cityStreetsData = null;
+
+async function ensureCityStreetsLoaded() {
+  if (cityStreetsData) return cityStreetsData;
+  const response = await fetch("data/cities-streets.json");
+  cityStreetsData = await response.json();
+  return cityStreetsData;
+}
+
+function getAllKnownCities() {
+  const overrides = readStore(STORAGE_KEYS.cityStreetOverrides, {});
+  return new Set([...Object.keys(cityStreetsData || {}), ...Object.keys(overrides)]);
+}
+
+function findCityMatch(inputCity) {
+  const allCities = getAllKnownCities();
+  if (allCities.has(inputCity)) return inputCity;
+
+  const normalizedInput = normalizeQuery(inputCity);
+  for (const city of allCities) {
+    const normalizedCity = normalizeQuery(city);
+    if (normalizedCity.includes(normalizedInput) || normalizedInput.includes(normalizedCity)) {
+      return city;
+    }
+  }
+
+  return null;
+}
+
+function getCityStreets(city) {
+  const overrides = readStore(STORAGE_KEYS.cityStreetOverrides, {});
+  if (overrides[city]) return overrides[city];
+  return (cityStreetsData && cityStreetsData[city]) || [];
+}
+
+function saveCityStreetsOverride(city, streets) {
+  const overrides = readStore(STORAGE_KEYS.cityStreetOverrides, {});
+  overrides[city] = streets;
+  writeStore(STORAGE_KEYS.cityStreetOverrides, overrides);
+}
+
+async function loadCityStreets() {
+  const cityInput = document.getElementById("city-input");
+  const city = cityInput.value.trim();
+  const block = document.getElementById("city-streets-block");
+  const textarea = document.getElementById("city-streets-textarea");
+
+  if (!city) {
+    window.alert("הזן שם עיר");
+    return;
+  }
+
+  await ensureCityStreetsLoaded();
+  const matchedCity = findCityMatch(city);
+
+  if (!matchedCity) {
+    window.alert('העיר לא נמצאה במאגר. ניתן להוסיף אותה במסך "מאגר רחובות לפי עיר" שבניהול.');
+    return;
+  }
+
+  const streets = getCityStreets(matchedCity);
+
+  if (!streets.length) {
+    window.alert("אין עדיין רחובות שמורים לעיר הזו במאגר");
+    return;
+  }
+
+  cityInput.value = matchedCity;
+  textarea.value = streets.join("\n");
+  block.classList.remove("hidden");
+}
+
+function saveCityStreets() {
+  const city = document.getElementById("city-input").value.trim();
+  const lineId = assignLineSelect.value;
+  const textarea = document.getElementById("city-streets-textarea");
+  const streets = textarea.value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (!city || !lineId) {
+    window.alert("בחר קו וטען רחובות לעיר");
+    return;
+  }
+
+  if (!streets.length) {
+    window.alert("אין רחובות לשיוך");
+    return;
+  }
+
+  const newAssignments = streets.map((street) => ({
+    id: createId("asgn"),
+    line_id: lineId,
+    query: `${street} ${city}`,
+    city,
+    street,
+    organization_id: currentSession.organization_id,
+  }));
+
+  dataRepository.saveAssignments([...dataRepository.getAllAssignments(), ...newAssignments]);
+
+  document.getElementById("city-input").value = "";
+  textarea.value = "";
+  document.getElementById("city-streets-block").classList.add("hidden");
+  renderAdmin();
+  window.alert(`${newAssignments.length} רחובות שויכו לקו בהצלחה`);
+}
+
+function loadSelectedCityStreets() {
+  const select = document.getElementById("city-database-select");
+  const textarea = document.getElementById("city-database-textarea");
+  textarea.value = getCityStreets(select.value).join("\n");
+}
+
+function renderCityDatabaseSelect() {
+  const select = document.getElementById("city-database-select");
+
+  if (!cityStreetsData) {
+    select.innerHTML = '<option value="">טוען ערים...</option>';
+    ensureCityStreetsLoaded().then(() => renderCityDatabaseSelect());
+    return;
+  }
+
+  const cities = Array.from(getAllKnownCities()).sort((a, b) => a.localeCompare(b, "he"));
+  const previousValue = select.value;
+
+  select.innerHTML = "";
+  cities.forEach((city) => {
+    const option = document.createElement("option");
+    option.value = city;
+    option.textContent = city;
+    select.appendChild(option);
+  });
+
+  select.value = cities.includes(previousValue) ? previousValue : cities[0] || "";
+  loadSelectedCityStreets();
+}
+
+function saveCityDatabaseStreets() {
+  const select = document.getElementById("city-database-select");
+  const textarea = document.getElementById("city-database-textarea");
+  const city = select.value;
+
+  if (!city) return;
+
+  const streets = textarea.value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  saveCityStreetsOverride(city, streets);
+  window.alert(`הרחובות של ${city} נשמרו`);
+}
+
+function addNewCityToDatabase() {
+  const input = document.getElementById("new-city-input");
+  const city = input.value.trim();
+
+  if (!city) {
+    window.alert("הזן שם עיר");
+    return;
+  }
+
+  saveCityStreetsOverride(city, []);
+  input.value = "";
+  renderCityDatabaseSelect();
+
+  const select = document.getElementById("city-database-select");
+  select.value = city;
+  loadSelectedCityStreets();
+  document.getElementById("city-database-textarea").focus();
+}
+
 function completeLogin(session, options = {}) {
   currentSession = session;
   seedOrgDataIfNeeded(session.organization_id);
@@ -898,16 +1165,57 @@ function completeLogin(session, options = {}) {
   }
 }
 
+function hideAllAuthSteps() {
+  phoneStep.classList.add("hidden");
+  activateStep.classList.add("hidden");
+  setPasswordStep.classList.add("hidden");
+  passwordStep.classList.add("hidden");
+}
+
+function showPhoneStep() {
+  hideAllAuthSteps();
+  phoneStep.classList.remove("hidden");
+  clearAuthMessages();
+  document.getElementById("phone").focus();
+}
+
+function showActivateStep() {
+  hideAllAuthSteps();
+  activateStep.classList.remove("hidden");
+  document.getElementById("activation-code").value = "";
+  document.getElementById("activation-code").focus();
+}
+
+function showSetPasswordStep(role) {
+  hideAllAuthSteps();
+  setPasswordStep.classList.remove("hidden");
+
+  const requiredLength = passwordLengthForRole(role);
+  const newPasswordInput = document.getElementById("new-password");
+  const confirmPasswordInput = document.getElementById("confirm-password");
+  newPasswordInput.maxLength = requiredLength;
+  confirmPasswordInput.maxLength = requiredLength;
+  newPasswordInput.value = "";
+  confirmPasswordInput.value = "";
+  document.getElementById("set-password-hint").textContent =
+    `בחר סיסמה בת ${requiredLength} ספרות שתשמש אותך בכניסות הבאות.`;
+  newPasswordInput.focus();
+}
+
+function showPasswordStep() {
+  hideAllAuthSteps();
+  passwordStep.classList.remove("hidden");
+  document.getElementById("login-password").value = "";
+  document.getElementById("login-password").focus();
+}
+
 function logout() {
   authRepository.clearSession();
   currentSession = null;
   pendingPhone = "";
   updateSessionSummary(null);
-  phoneStep.classList.remove("hidden");
-  otpStep.classList.add("hidden");
-  clearAuthMessages();
   document.getElementById("phone").value = "";
-  document.getElementById("otp").value = "";
+  showPhoneStep();
   showScreen("login-screen");
 }
 
@@ -950,10 +1258,10 @@ function registerServiceWorker() {
 document.getElementById("send-code").addEventListener("click", () => {
   clearAuthMessages();
   const button = document.getElementById("send-code");
-  setButtonLoading(button, true, "שולח...");
+  setButtonLoading(button, true, "בודק...");
 
   window.setTimeout(() => {
-    const result = authService.requestOtp(document.getElementById("phone").value);
+    const result = authService.startLogin(document.getElementById("phone").value);
     setButtonLoading(button, false);
 
     if (!result.ok) {
@@ -962,24 +1270,40 @@ document.getElementById("send-code").addEventListener("click", () => {
     }
 
     pendingPhone = result.phone;
-    phoneStep.classList.add("hidden");
-    otpStep.classList.remove("hidden");
-    otpHint.textContent = IS_DEMO
-      ? `קוד נשלח ב-SMS. בדמו: ${result.otp.demo_code}. תוקף הקוד 5 דקות.`
-      : "קוד נשלח ב-SMS. תוקף הקוד 5 דקות.";
-    document.getElementById("otp").value = "";
-    document.getElementById("otp").focus();
-  }, 250);
+
+    if (result.mode === "bootstrap") {
+      authStatus.textContent = "יוצר ארגון ומשייך אדמין...";
+      authStatus.classList.remove("hidden");
+      window.setTimeout(() => {
+        const bootstrapResult = authService.beginBootstrap(pendingPhone);
+        authStatus.classList.add("hidden");
+        showSetPasswordStep(bootstrapResult.role);
+      }, 650);
+      return;
+    }
+
+    if (result.mode === "password") {
+      showPasswordStep();
+      return;
+    }
+
+    if (result.mode === "set-password") {
+      showSetPasswordStep(result.role);
+      return;
+    }
+
+    showActivateStep();
+  }, 200);
 });
 
-document.getElementById("verify-code").addEventListener("click", () => {
+document.getElementById("activate-btn").addEventListener("click", () => {
   clearAuthMessages();
-  const button = document.getElementById("verify-code");
+  const button = document.getElementById("activate-btn");
   setButtonLoading(button, true, "מאמת...");
 
   window.setTimeout(() => {
-    const otp = document.getElementById("otp").value.trim();
-    const result = authService.verifyOtp(pendingPhone, otp);
+    const code = document.getElementById("activation-code").value.trim();
+    const result = authService.verifyActivationCode(pendingPhone, code);
     setButtonLoading(button, false);
 
     if (!result.ok) {
@@ -987,23 +1311,51 @@ document.getElementById("verify-code").addEventListener("click", () => {
       return;
     }
 
-    if (result.bootstrapped) {
-      authStatus.textContent = "יוצר ארגון ומשייך אדמין...";
-      authStatus.classList.remove("hidden");
-      window.setTimeout(() => completeLogin(result.session), 650);
+    showSetPasswordStep(result.role);
+  }, 200);
+});
+
+document.getElementById("save-password-btn").addEventListener("click", () => {
+  clearAuthMessages();
+  const button = document.getElementById("save-password-btn");
+  setButtonLoading(button, true, "שומר...");
+
+  window.setTimeout(() => {
+    const password = document.getElementById("new-password").value.trim();
+    const confirmPassword = document.getElementById("confirm-password").value.trim();
+    const result = authService.setPassword(pendingPhone, password, confirmPassword);
+    setButtonLoading(button, false);
+
+    if (!result.ok) {
+      showError(result.reason);
       return;
     }
 
     completeLogin(result.session);
-  }, 250);
+  }, 200);
 });
 
-document.getElementById("back-to-phone").addEventListener("click", () => {
-  otpStep.classList.add("hidden");
-  phoneStep.classList.remove("hidden");
+document.getElementById("login-password-btn").addEventListener("click", () => {
   clearAuthMessages();
-  document.getElementById("phone").focus();
+  const button = document.getElementById("login-password-btn");
+  setButtonLoading(button, true, "מתחבר...");
+
+  window.setTimeout(async () => {
+    const password = document.getElementById("login-password").value;
+    const result = await authService.verifyPassword(pendingPhone, password);
+    setButtonLoading(button, false);
+
+    if (!result.ok) {
+      showError(result.reason);
+      return;
+    }
+
+    completeLogin(result.session);
+  }, 200);
 });
+
+document.getElementById("back-to-phone-from-activate").addEventListener("click", showPhoneStep);
+document.getElementById("back-to-phone-from-password").addEventListener("click", showPhoneStep);
 
 document.querySelectorAll(".logout-btn").forEach((button) => {
   button.addEventListener("click", logout);
@@ -1050,13 +1402,22 @@ navItems.forEach((item) => {
 document.getElementById("add-worker-btn").addEventListener("click", addWorker);
 document.getElementById("add-line-btn").addEventListener("click", addLine);
 document.getElementById("assign-btn").addEventListener("click", assignAddress);
+document.getElementById("load-streets-btn").addEventListener("click", loadCityStreets);
+document.getElementById("save-city-streets-btn").addEventListener("click", saveCityStreets);
+document.getElementById("city-database-select").addEventListener("change", loadSelectedCityStreets);
+document.getElementById("save-city-database-btn").addEventListener("click", saveCityDatabaseStreets);
+document.getElementById("add-city-btn").addEventListener("click", addNewCityToDatabase);
 adminFilter.addEventListener("input", () => renderAdmin());
 
 bindEnterKey(document.getElementById("phone"), () => document.getElementById("send-code").click());
-bindEnterKey(document.getElementById("otp"), () => document.getElementById("verify-code").click());
+bindEnterKey(document.getElementById("activation-code"), () => document.getElementById("activate-btn").click());
+bindEnterKey(document.getElementById("confirm-password"), () => document.getElementById("save-password-btn").click());
+bindEnterKey(document.getElementById("login-password"), () => document.getElementById("login-password-btn").click());
 bindEnterKey(addressSearch, () => document.getElementById("search-btn").click());
 bindEnterKey(document.getElementById("new-worker"), addWorker);
 bindEnterKey(document.getElementById("assign-line"), assignAddress);
+bindEnterKey(document.getElementById("city-input"), loadCityStreets);
 
 initApp();
 registerServiceWorker();
+ensureCityStreetsLoaded().catch(() => {});

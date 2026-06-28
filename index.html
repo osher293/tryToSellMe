@@ -33,15 +33,31 @@
         <section class="card auth-card" id="phone-step">
           <label for="phone">מספר טלפון</label>
           <input id="phone" type="tel" inputmode="tel" placeholder="050-0000000" autocomplete="tel" />
-          <button class="primary-btn" id="send-code" type="button">שלח קוד אימות</button>
+          <button class="primary-btn" id="send-code" type="button">המשך</button>
         </section>
 
-        <section class="card auth-card hidden" id="otp-step">
-          <label for="otp">קוד OTP</label>
-          <input id="otp" type="text" inputmode="numeric" maxlength="6" placeholder="הזן קוד אימות" aria-describedby="otp-hint" />
-          <p class="auth-hint" id="otp-hint"></p>
-          <button class="primary-btn" id="verify-code" type="button">אמת קוד</button>
-          <button class="text-btn" id="back-to-phone" type="button">החלף מספר טלפון</button>
+        <section class="card auth-card hidden" id="activate-step">
+          <label for="activation-code">קוד הפעלה</label>
+          <input id="activation-code" type="text" inputmode="numeric" maxlength="6" placeholder="הזן קוד הפעלה" />
+          <p class="auth-hint">עובד חדש? בקש מהאדמין את קוד ההפעלה החד-פעמי שקיבל.</p>
+          <button class="primary-btn" id="activate-btn" type="button">אישור קוד</button>
+          <button class="text-btn" id="back-to-phone-from-activate" type="button">החלף מספר טלפון</button>
+        </section>
+
+        <section class="card auth-card hidden" id="set-password-step">
+          <label for="new-password">סיסמה חדשה</label>
+          <input id="new-password" type="password" inputmode="numeric" placeholder="הזן סיסמה" />
+          <label for="confirm-password">אימות סיסמה</label>
+          <input id="confirm-password" type="password" inputmode="numeric" placeholder="הזן שוב את הסיסמה" />
+          <p class="auth-hint" id="set-password-hint"></p>
+          <button class="primary-btn" id="save-password-btn" type="button">שמור והתחבר</button>
+        </section>
+
+        <section class="card auth-card hidden" id="password-step">
+          <label for="login-password">סיסמה</label>
+          <input id="login-password" type="password" inputmode="numeric" placeholder="הזן סיסמה" />
+          <button class="primary-btn" id="login-password-btn" type="button">התחבר</button>
+          <button class="text-btn" id="back-to-phone-from-password" type="button">החלף מספר טלפון</button>
         </section>
 
         <div class="error-banner hidden" id="access-error" role="alert" aria-live="assertive"></div>
@@ -179,12 +195,53 @@
               <h3>ניהול קווי חלוקה</h3>
               <button class="small-btn" id="add-line-btn" type="button">קו חדש</button>
             </div>
-            <div id="lines-list"></div>
-            <label for="assign-line-select">שיוך עיר, רחוב או קיבוץ לקו</label>
-            <select id="assign-line-select" aria-label="בחר קו לשיוך"></select>
-            <div class="inline-action">
-              <input id="assign-line" type="text" placeholder="לדוגמה: רחוב הרצל נתניה" />
-              <button id="assign-btn" type="button">שייך</button>
+            <div class="admin-subsection admin-subsection-first">
+              <div id="lines-list"></div>
+            </div>
+
+            <div class="admin-subsection">
+              <label for="assign-line-select">שיוך עיר, רחוב או קיבוץ לקו</label>
+              <select id="assign-line-select" aria-label="בחר קו לשיוך"></select>
+              <div class="inline-action">
+                <input id="assign-line" type="text" placeholder="לדוגמה: רחוב הרצל נתניה" />
+                <button id="assign-btn" type="button">שייך</button>
+              </div>
+            </div>
+
+            <div class="admin-subsection">
+              <label for="city-input">טעינת כל הרחובות של עיר מהמאגר</label>
+              <div class="inline-action">
+                <input id="city-input" type="text" placeholder="לדוגמה: נתניה" />
+                <button id="load-streets-btn" type="button">טען רחובות</button>
+              </div>
+              <div class="hidden" id="city-streets-block">
+                <label for="city-streets-textarea">רחובות שנמצאו (ניתן לערוך לפני שיוך)</label>
+                <textarea id="city-streets-textarea" rows="8"></textarea>
+                <button class="primary-btn full-width" id="save-city-streets-btn" type="button">שייך את כל הרחובות לקו</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="card admin-card">
+            <div class="card-heading">
+              <h3>מאגר רחובות לפי עיר (כל הארץ)</h3>
+            </div>
+            <p class="auth-hint">מקור: מרשם רחובות של רשות האוכלוסין וההגירה. ניתן לערוך כל עיר אם הרחובות שלה משתנים.</p>
+
+            <div class="admin-subsection admin-subsection-first">
+              <label for="city-database-select">בחר עיר</label>
+              <select id="city-database-select" aria-label="בחר עיר מהמאגר"></select>
+              <label for="city-database-textarea">רחובות (ניתן לערוך)</label>
+              <textarea id="city-database-textarea" rows="10"></textarea>
+              <button class="primary-btn full-width" id="save-city-database-btn" type="button">שמור שינויים לעיר</button>
+            </div>
+
+            <div class="admin-subsection">
+              <label for="new-city-input">הוספת עיר שלא נמצאת ברשימה</label>
+              <div class="inline-action">
+                <input id="new-city-input" type="text" placeholder="שם עיר חדש" />
+                <button id="add-city-btn" type="button">הוסף</button>
+              </div>
             </div>
           </article>
         </section>
