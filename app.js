@@ -34,6 +34,7 @@ const STORAGE_KEYS = {
   assignments: "deliveryLineAssignments",
   history: "deliveryLineHistory",
   cityStreetOverrides: "deliveryLineCityStreetOverrides",
+  cityRenames: "deliveryLineCityRenames",
 };
 
 const ROLE_LABELS = {
@@ -344,7 +345,7 @@ const searchService = {
   },
   getSuggestions(organizationId, rawQuery, limit = 6) {
     const query = normalizeQuery(rawQuery);
-    if (query.length < 2) return [];
+    if (query.length < 3) return [];
 
     const lines = dataRepository.getLines(organizationId);
     const lineMap = Object.fromEntries(lines.map((line) => [line.id, line]));
@@ -1261,18 +1262,31 @@ async function ensureCityStreetsLoaded() {
 
 function getAllKnownCities() {
   const overrides = readStore(STORAGE_KEYS.cityStreetOverrides, {});
-  return new Set([...Object.keys(cityStreetsData || {}), ...Object.keys(overrides)]);
+  const renames = readStore(STORAGE_KEYS.cityRenames, {});
+  const all = new Set([...Object.keys(cityStreetsData || {}), ...Object.keys(overrides)]);
+  Object.keys(renames).forEach((oldName) => all.delete(oldName));
+  return all;
 }
 
 function findCityMatch(inputCity) {
   const allCities = getAllKnownCities();
+  const renames = readStore(STORAGE_KEYS.cityRenames, {});
+
   if (allCities.has(inputCity)) return inputCity;
+  if (renames[inputCity]) return renames[inputCity];
 
   const normalizedInput = normalizeQuery(inputCity);
   for (const city of allCities) {
     const normalizedCity = normalizeQuery(city);
     if (normalizedCity.includes(normalizedInput) || normalizedInput.includes(normalizedCity)) {
       return city;
+    }
+  }
+
+  for (const [oldName, newName] of Object.entries(renames)) {
+    const normalizedOld = normalizeQuery(oldName);
+    if (normalizedOld.includes(normalizedInput) || normalizedInput.includes(normalizedOld)) {
+      return newName;
     }
   }
 
@@ -1421,7 +1435,10 @@ function resetCityDatabaseStreets() {
 
   if (!city) return;
 
-  const isInOriginalDatabase = Boolean(cityStreetsData && cityStreetsData[city]);
+  const renames = readStore(STORAGE_KEYS.cityRenames, {});
+  const originalName = Object.keys(renames).find((oldName) => renames[oldName] === city) || city;
+  const isInOriginalDatabase = Boolean(cityStreetsData && cityStreetsData[originalName]);
+
   if (!isInOriginalDatabase) {
     window.alert("העיר הזו אינה קיימת במאגר המקורי, ולכן אין אליה רשימה לאפס. אפשר רק לערוך ולשמור.");
     return;
@@ -1432,7 +1449,11 @@ function resetCityDatabaseStreets() {
   }
 
   const overrides = readStore(STORAGE_KEYS.cityStreetOverrides, {});
-  delete overrides[city];
+  if (originalName === city) {
+    delete overrides[city];
+  } else {
+    overrides[city] = cityStreetsData[originalName];
+  }
   writeStore(STORAGE_KEYS.cityStreetOverrides, overrides);
   loadSelectedCityStreets();
   window.alert(`הרחובות של ${city} אופסו לרשימה המקורית`);
@@ -1455,6 +1476,54 @@ function addNewCityToDatabase() {
   select.value = city;
   loadSelectedCityStreets();
   document.getElementById("city-database-textarea").focus();
+}
+
+function renameCityInDatabase() {
+  const select = document.getElementById("city-database-select");
+  const oldName = select.value;
+  const newNameInput = document.getElementById("rename-city-input");
+  const newName = newNameInput.value.trim();
+
+  if (!oldName) return;
+
+  if (!newName) {
+    window.alert("הזן שם חדש לעיר");
+    return;
+  }
+
+  if (newName === oldName) return;
+
+  if (getAllKnownCities().has(newName)) {
+    window.alert(`עיר בשם "${newName}" כבר קיימת במאגר`);
+    return;
+  }
+
+  if (!window.confirm(`לשנות את השם "${oldName}" ל-"${newName}"? קווים שמשתמשים בעיר הזו יתעדכנו אוטומטית.`)) {
+    return;
+  }
+
+  const streets = getCityStreets(oldName);
+  const overrides = readStore(STORAGE_KEYS.cityStreetOverrides, {});
+  delete overrides[oldName];
+  overrides[newName] = streets;
+  writeStore(STORAGE_KEYS.cityStreetOverrides, overrides);
+
+  const renames = readStore(STORAGE_KEYS.cityRenames, {});
+  renames[oldName] = newName;
+  writeStore(STORAGE_KEYS.cityRenames, renames);
+
+  const updatedAssignments = dataRepository.getAllAssignments().map((item) => {
+    if (getAssignmentCity(item) !== oldName) return item;
+    return { ...item, city: newName, query: item.street ? `${item.street} ${newName}` : newName };
+  });
+  dataRepository.saveAssignments(updatedAssignments);
+
+  newNameInput.value = "";
+  renderCityDatabaseSelect();
+  select.value = newName;
+  loadSelectedCityStreets();
+  renderAdmin();
+  window.alert(`העיר שונתה ל-"${newName}"`);
 }
 
 function completeLogin(session, options = {}) {
@@ -1724,6 +1793,7 @@ document.getElementById("save-city-streets-btn").addEventListener("click", saveC
 document.getElementById("city-database-select").addEventListener("change", loadSelectedCityStreets);
 document.getElementById("save-city-database-btn").addEventListener("click", saveCityDatabaseStreets);
 document.getElementById("reset-city-database-btn").addEventListener("click", resetCityDatabaseStreets);
+document.getElementById("rename-city-btn").addEventListener("click", renameCityInDatabase);
 document.getElementById("add-city-btn").addEventListener("click", addNewCityToDatabase);
 document.getElementById("line-streets-modal-close").addEventListener("click", closeLineStreetsModal);
 document.getElementById("line-streets-modal").addEventListener("click", (event) => {
@@ -1751,6 +1821,7 @@ bindEnterKey(document.getElementById("new-worker"), addWorker);
 bindEnterKey(document.getElementById("assign-line"), assignAddress);
 bindEnterKey(document.getElementById("city-input"), loadCityStreets);
 bindEnterKey(document.getElementById("line-add-city-input"), addCityToLine);
+bindEnterKey(document.getElementById("rename-city-input"), renameCityInDatabase);
 
 initApp();
 registerServiceWorker();

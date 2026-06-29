@@ -1,5 +1,13 @@
-const CACHE = "delivery-lines-v1";
-const ASSETS = ["./", "./index.html", "./app.js", "./styles.css", "./manifest.json", "./favicon.svg"];
+const CACHE = "delivery-lines-v2";
+const ASSETS = [
+  "./",
+  "./index.html",
+  "./app.js",
+  "./styles.css",
+  "./manifest.json",
+  "./favicon.svg",
+  "./data/cities-streets.json",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)));
