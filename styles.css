@@ -812,4 +812,25 @@ button:disabled {
   .bottom-nav {
     width: min(100%, 1100px);
   }
+
+  .app-shell.app-shell--wide {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  .app-shell.app-shell--wide #admin-screen.screen {
+    flex: 1;
+  }
+
+  .app-shell.app-shell--wide .bottom-nav {
+    position: static;
+    left: auto;
+    bottom: auto;
+    transform: none;
+    width: 100%;
+    max-width: 1600px;
+    margin: 0 auto;
+    box-shadow: none;
+  }
 }
