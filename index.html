@@ -79,12 +79,6 @@
             <h2 id="search-title">איתור קו חלוקה</h2>
             <small class="session-summary" id="session-summary"></small>
           </div>
-          <button class="icon-btn logout-btn" type="button" aria-label="יציאה">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M10 17l-1.4-1.4L11.2 13H3v-2h8.2L8.6 8.4 10 7l5 5z" />
-              <path d="M13 3h7v18h-7v-2h5V5h-5z" />
-            </svg>
-          </button>
         </header>
 
         <section class="search-hero card">
@@ -109,12 +103,6 @@
             <p>מסך תוצאה</p>
             <h2 id="result-title">קו מתאים למשלוח</h2>
           </div>
-          <button class="icon-btn logout-btn" type="button" aria-label="יציאה">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M10 17l-1.4-1.4L11.2 13H3v-2h8.2L8.6 8.4 10 7l5 5z" />
-              <path d="M13 3h7v18h-7v-2h5V5h-5z" />
-            </svg>
-          </button>
         </header>
 
         <section class="result-card card" id="result-card">
@@ -152,16 +140,29 @@
             <p>היסטוריה</p>
             <h2 id="history-title">חיפושים שבוצעו</h2>
           </div>
-          <button class="icon-btn logout-btn" type="button" aria-label="יציאה">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M10 17l-1.4-1.4L11.2 13H3v-2h8.2L8.6 8.4 10 7l5 5z" />
-              <path d="M13 3h7v18h-7v-2h5V5h-5z" />
-            </svg>
-          </button>
         </header>
 
         <section class="history-list" id="history-list"></section>
         <p class="empty-state hidden" id="history-empty">עדיין לא ביצעת חיפושים</p>
+      </main>
+
+      <main class="screen" id="settings-screen" aria-labelledby="settings-title">
+        <header class="app-header">
+          <div>
+            <p>הגדרות</p>
+            <h2 id="settings-title">הגדרות</h2>
+          </div>
+        </header>
+
+        <div class="settings-spacer"></div>
+
+        <button class="danger-btn full-width logout-btn" type="button" id="settings-logout-btn">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M10 17l-1.4-1.4L11.2 13H3v-2h8.2L8.6 8.4 10 7l5 5z" />
+            <path d="M13 3h7v18h-7v-2h5V5h-5z" />
+          </svg>
+          <span>יציאה מהמערכת</span>
+        </button>
       </main>
 
       <main class="screen" id="admin-screen" aria-labelledby="admin-title">
@@ -173,12 +174,6 @@
             </div>
             <div class="admin-header-actions">
               <input type="search" id="admin-filter" placeholder="חיפוש מהיר בתוך רשימות" aria-label="חיפוש מהיר בתוך רשימות" />
-              <button class="icon-btn logout-btn" type="button" aria-label="יציאה">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M10 17l-1.4-1.4L11.2 13H3v-2h8.2L8.6 8.4 10 7l5 5z" />
-                  <path d="M13 3h7v18h-7v-2h5V5h-5z" />
-                </svg>
-              </button>
             </div>
           </header>
 
@@ -288,6 +283,12 @@
             <path d="M9 12l2 2 4-5 1.6 1.2-5.5 6.8-3.7-3.7z" />
           </svg>
           <span>ניהול</span>
+        </button>
+        <button class="nav-item" data-target="settings-screen" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M19.4 13a7.6 7.6 0 000-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 00-1.7-1L14.9 3h-4l-.4 2.9a7.6 7.6 0 00-1.7 1l-2.5-1-2 3.5L6.4 11a7.6 7.6 0 000 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 001.7 1l.4 2.9h4l.4-2.9a7.6 7.6 0 001.7-1l2.5 1 2-3.5-2.1-1.6zM12.9 15a3 3 0 110-6 3 3 0 010 6z" />
+          </svg>
+          <span>הגדרות</span>
         </button>
       </nav>
     </div>

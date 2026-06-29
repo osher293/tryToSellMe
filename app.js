@@ -1,3 +1,12 @@
+function isDesktopDevice() {
+  const userAgent = navigator.userAgent || "";
+  const isMobileUserAgent = /Mobi|Android|iPhone|iPad|iPod/i.test(userAgent);
+  const hasCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
+  return !isMobileUserAgent && !hasCoarsePointer;
+}
+
+document.documentElement.classList.toggle("is-desktop", isDesktopDevice());
+
 const screens = document.querySelectorAll(".screen");
 const bottomNav = document.getElementById("bottom-nav");
 const navItems = document.querySelectorAll(".nav-item");
@@ -44,7 +53,13 @@ const ROLE_LABELS = {
 };
 
 const MANAGER_ROLES = new Set(["admin", "manager"]);
-const PROTECTED_SCREENS = new Set(["search-screen", "result-screen", "history-screen", "admin-screen"]);
+const PROTECTED_SCREENS = new Set([
+  "search-screen",
+  "result-screen",
+  "history-screen",
+  "admin-screen",
+  "settings-screen",
+]);
 const ROLE_RANK = { worker: 1, manager: 2, admin: 3 };
 
 function canActorChangeTargetRole(actorRole, targetRole) {
@@ -552,7 +567,7 @@ const authService = {
 function applyRoleUi(role) {
   const isManager = canManage(role);
   managerNavItem.classList.toggle("hidden", !isManager);
-  bottomNav.classList.toggle("nav-two-items", !isManager);
+  bottomNav.classList.toggle("nav-worker-items", !isManager);
 }
 
 function showScreen(screenId) {

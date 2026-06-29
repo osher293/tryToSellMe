@@ -104,6 +104,15 @@ label {
   display: block;
 }
 
+#settings-screen.screen.active {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-spacer {
+  flex: 1;
+}
+
 .hidden {
   display: none !important;
 }
@@ -687,6 +696,21 @@ button:disabled {
   background: #fecaca !important;
 }
 
+#settings-logout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 1.1rem;
+}
+
+#settings-logout-btn svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
 .bottom-nav {
   position: fixed;
   left: 50%;
@@ -694,7 +718,7 @@ button:disabled {
   width: min(100%, 520px);
   transform: translateX(-50%);
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 1px;
   padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
   background: #fff;
@@ -703,8 +727,8 @@ button:disabled {
   z-index: 10;
 }
 
-.bottom-nav.nav-two-items {
-  grid-template-columns: repeat(2, 1fr);
+.bottom-nav.nav-worker-items {
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .nav-item {
@@ -832,5 +856,34 @@ button:disabled {
     max-width: 1600px;
     margin: 0 auto;
     box-shadow: none;
+  }
+
+  html.is-desktop .bottom-nav {
+    position: fixed;
+    top: 0;
+    bottom: auto;
+    border-top: 0;
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+  }
+
+  html.is-desktop .screen {
+    padding-top: 84px;
+    padding-bottom: 24px;
+  }
+
+  html.is-desktop #admin-screen.screen {
+    padding-top: 84px;
+  }
+
+  html.is-desktop .app-shell.app-shell--wide .bottom-nav {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    bottom: auto;
+    transform: translateX(-50%);
+    width: min(100%, 1600px);
+    margin: 0;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
   }
 }
