@@ -837,13 +837,15 @@ function renderLines(filter = "") {
 
     const title = document.createElement("b");
     title.textContent = `קו ${line.number}`;
+    info.append(title);
 
-    const areasText = line.areas.join(" · ");
-    const areas = document.createElement("span");
-    areas.textContent = areasText;
-    areas.title = areasText;
-
-    info.append(title, areas);
+    if (line.areas.length) {
+      const areasText = line.areas.join(" · ");
+      const areas = document.createElement("span");
+      areas.textContent = areasText;
+      areas.title = areasText;
+      info.append(areas);
+    }
 
     const actions = document.createElement("div");
     actions.className = "line-row-actions";
@@ -881,11 +883,25 @@ function renderAdmin() {
 function openEditLineModal(line) {
   currentEditLineId = line.id;
   document.getElementById("edit-line-modal-title").textContent = `עריכת קו ${line.number}`;
+  const numberInput = document.getElementById("edit-line-number");
+  numberInput.value = line.number;
+  numberInput.disabled = true;
   document.getElementById("edit-line-name").value = line.name;
-  document.getElementById("edit-line-areas").value = line.areas.join(", ");
   document.getElementById("edit-line-notes").value = line.notes || "";
   document.getElementById("edit-line-modal").classList.remove("hidden");
   document.getElementById("edit-line-name").focus();
+}
+
+function openCreateLineModal() {
+  currentEditLineId = "new";
+  document.getElementById("edit-line-modal-title").textContent = "קו חדש";
+  const numberInput = document.getElementById("edit-line-number");
+  numberInput.value = "";
+  numberInput.disabled = false;
+  document.getElementById("edit-line-name").value = "";
+  document.getElementById("edit-line-notes").value = "";
+  document.getElementById("edit-line-modal").classList.remove("hidden");
+  numberInput.focus();
 }
 
 function closeEditLineModal() {
@@ -902,16 +918,41 @@ function saveEditLineModal() {
     return;
   }
 
+  if (currentEditLineId === "new") {
+    const number = document.getElementById("edit-line-number").value.trim();
+    if (!number) {
+      window.alert("הזן מספר קו");
+      return;
+    }
+
+    const existingLines = dataRepository.getLines(currentSession.organization_id);
+    const normalizedNumber = normalizeQuery(number);
+    if (existingLines.some((item) => normalizeQuery(String(item.number)) === normalizedNumber)) {
+      window.alert(`קו ${number} כבר קיים. אם זה קו נפרד לאזור אחר, תן לו סיומת שונה (למשל 18א, 18ב)`);
+      return;
+    }
+
+    const line = {
+      id: createId("line"),
+      number,
+      name,
+      areas: [],
+      notes: document.getElementById("edit-line-notes").value.trim(),
+      color: "#005fcc",
+      organization_id: currentSession.organization_id,
+    };
+
+    dataRepository.saveLines([...dataRepository.getAllLines(), line]);
+    closeEditLineModal();
+    renderAdmin();
+    return;
+  }
+
   const allLines = dataRepository.getAllLines();
   const target = allLines.find((item) => item.id === currentEditLineId);
   if (!target) return;
 
   target.name = name;
-  target.areas = document
-    .getElementById("edit-line-areas")
-    .value.split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
   target.notes = document.getElementById("edit-line-notes").value.trim();
 
   dataRepository.saveLines(allLines);
@@ -1016,46 +1057,6 @@ function saveLineStreetsModal() {
   closeLineStreetsModal();
   renderAdmin();
   window.alert("השינויים נשמרו");
-}
-
-function addLine() {
-  const numberInput = window.prompt("מספר קו (אפשר גם עם אות, למשל 18א):", "");
-  if (numberInput === null) return;
-
-  const number = numberInput.trim();
-  if (!number) {
-    window.alert("הזן מספר קו תקין");
-    return;
-  }
-
-  const existingLines = dataRepository.getLines(currentSession.organization_id);
-  const normalizedNumber = normalizeQuery(number);
-  if (existingLines.some((item) => normalizeQuery(String(item.number)) === normalizedNumber)) {
-    window.alert(`קו ${number} כבר קיים. אם זה קו נפרד לאזור אחר, תן לו סיומת שונה (למשל 18א, 18ב)`);
-    return;
-  }
-
-  const name = window.prompt("שם אזור:", "");
-  if (name === null || !name.trim()) return;
-
-  const areasInput = window.prompt("רחובות/אזורים (מופרדים בפסיק):", "");
-  if (areasInput === null) return;
-
-  const line = {
-    id: createId("line"),
-    number,
-    name: name.trim(),
-    areas: areasInput
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean),
-    notes: "",
-    color: "#005fcc",
-    organization_id: currentSession.organization_id,
-  };
-
-  dataRepository.saveLines([...dataRepository.getAllLines(), line]);
-  renderAdmin();
 }
 
 function addWorker() {
@@ -1588,7 +1589,7 @@ document.querySelectorAll(".admin-tab").forEach((tab) => {
 });
 
 document.getElementById("add-worker-btn").addEventListener("click", addWorker);
-document.getElementById("add-line-btn").addEventListener("click", addLine);
+document.getElementById("add-line-btn").addEventListener("click", openCreateLineModal);
 document.getElementById("assign-btn").addEventListener("click", assignAddress);
 document.getElementById("load-streets-btn").addEventListener("click", loadCityStreets);
 document.getElementById("save-city-streets-btn").addEventListener("click", saveCityStreets);
