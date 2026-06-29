@@ -94,7 +94,13 @@ let currentEditLineId = null;
 
 function readStore(key, fallback) {
   const raw = localStorage.getItem(key);
-  return raw ? JSON.parse(raw) : fallback;
+  if (!raw) return fallback;
+
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    return fallback;
+  }
 }
 
 function writeStore(key, value) {
@@ -127,6 +133,12 @@ function passwordLengthForRole(role) {
   return role === "worker" ? 4 : 7;
 }
 
+const UNSAFE_OBJECT_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+function isSafeObjectKey(key) {
+  return typeof key === "string" && key.length > 0 && !UNSAFE_OBJECT_KEYS.has(key);
+}
+
 function normalizeQuery(query) {
   return query
     .trim()
@@ -143,6 +155,10 @@ function createSessionToken() {
 
 function canManage(role) {
   return MANAGER_ROLES.has(role);
+}
+
+function requireManagerAccess() {
+  return Boolean(currentSession) && canManage(currentSession.role);
 }
 
 function setButtonLoading(button, loading, loadingText) {
@@ -809,6 +825,16 @@ function renderWorkers(filter = "") {
       const usersAll = authRepository.getUsers();
       const target = usersAll.find((item) => item.id === user.id);
       if (!target) return;
+
+      if (
+        target.id === currentSession.user_id ||
+        !canActorChangeTargetRole(currentSession.role, target.role) ||
+        ROLE_RANK[roleSelect.value] > ROLE_RANK[currentSession.role]
+      ) {
+        renderWorkers(adminFilter.value);
+        return;
+      }
+
       target.role = roleSelect.value;
       authRepository.saveUsers(usersAll);
       if (user.id === currentSession.user_id) {
@@ -825,6 +851,11 @@ function renderWorkers(filter = "") {
     removeBtn.textContent = "הסר";
     removeBtn.disabled = !canChangeThisUser;
     removeBtn.addEventListener("click", () => {
+      if (user.id === currentSession.user_id || !canActorChangeTargetRole(currentSession.role, user.role)) {
+        renderWorkers(adminFilter.value);
+        return;
+      }
+
       const orgUsers = authRepository.getOrgUsers(currentSession.organization_id);
       const admins = orgUsers.filter((item) => item.role === "admin");
       if (user.role === "admin" && admins.length <= 1) {
@@ -912,6 +943,7 @@ function renderAdmin() {
 }
 
 function openEditLineModal(line) {
+  if (!requireManagerAccess()) return;
   currentEditLineId = line.id;
   document.getElementById("edit-line-modal-title").textContent = `עריכת קו ${line.number}`;
   const numberInput = document.getElementById("edit-line-number");
@@ -924,6 +956,7 @@ function openEditLineModal(line) {
 }
 
 function openCreateLineModal() {
+  if (!requireManagerAccess()) return;
   currentEditLineId = "new";
   document.getElementById("edit-line-modal-title").textContent = "קו חדש";
   const numberInput = document.getElementById("edit-line-number");
@@ -941,7 +974,7 @@ function closeEditLineModal() {
 }
 
 function saveEditLineModal() {
-  if (!currentEditLineId) return;
+  if (!requireManagerAccess() || !currentEditLineId) return;
 
   const name = document.getElementById("edit-line-name").value.trim();
   if (!name) {
@@ -992,6 +1025,7 @@ function saveEditLineModal() {
 }
 
 function deleteLine(line) {
+  if (!requireManagerAccess()) return;
   if (!window.confirm(`למחוק את קו ${line.number}?`)) return;
 
   dataRepository.saveLines(dataRepository.getAllLines().filter((item) => item.id !== line.id));
@@ -1012,6 +1046,7 @@ function getLineCities(lineId) {
 }
 
 function openLineStreetsModal(line) {
+  if (!requireManagerAccess()) return;
   currentLineStreetsModalLineId = line.id;
   document.getElementById("line-streets-modal-title").textContent = `ערים ורחובות של קו ${line.number}`;
   document.getElementById("line-add-city-input").value = "";
@@ -1070,6 +1105,7 @@ function renderLineCitiesList(lineId) {
 }
 
 function removeCityFromLine(lineId, city) {
+  if (!requireManagerAccess()) return;
   if (!window.confirm(`להסיר את כל הרחובות של ${city} מהקו הזה?`)) return;
 
   dataRepository.saveAssignments(
@@ -1081,6 +1117,7 @@ function removeCityFromLine(lineId, city) {
 }
 
 async function addCityToLine() {
+  if (!requireManagerAccess()) return;
   const input = document.getElementById("line-add-city-input");
   const cityInput = input.value.trim();
   const lineId = currentLineStreetsModalLineId;
@@ -1131,6 +1168,7 @@ async function addCityToLine() {
 }
 
 function openLineCityStreetsModal(lineId, city) {
+  if (!requireManagerAccess()) return;
   currentLineCityStreetsCity = city;
   document.getElementById("line-city-streets-modal-title").textContent = `רחובות בעיר ${city}`;
 
@@ -1149,6 +1187,7 @@ function closeLineCityStreetsModal() {
 }
 
 function saveLineCityStreetsModal() {
+  if (!requireManagerAccess()) return;
   const lineId = currentLineStreetsModalLineId;
   const city = currentLineCityStreetsCity;
   if (!lineId || !city) return;
@@ -1204,6 +1243,7 @@ function saveLineCityStreetsModal() {
 }
 
 function addWorker() {
+  if (!requireManagerAccess()) return;
   const phone = normalizePhone(document.getElementById("new-worker").value);
   if (phone.length < 9) {
     window.alert("הזן מספר טלפון תקין");
@@ -1235,6 +1275,7 @@ function addWorker() {
 }
 
 function assignAddress() {
+  if (!requireManagerAccess()) return;
   const rawInput = document.getElementById("assign-line").value.trim();
   const lineId = assignLineSelect.value;
 
@@ -1315,12 +1356,14 @@ function getCityStreets(city) {
 }
 
 function saveCityStreetsOverride(city, streets) {
+  if (!isSafeObjectKey(city)) return;
   const overrides = readStore(STORAGE_KEYS.cityStreetOverrides, {});
   overrides[city] = streets;
   writeStore(STORAGE_KEYS.cityStreetOverrides, overrides);
 }
 
 async function loadCityStreets() {
+  if (!requireManagerAccess()) return;
   const cityInput = document.getElementById("city-input");
   const city = cityInput.value.trim();
   const block = document.getElementById("city-streets-block");
@@ -1358,6 +1401,7 @@ async function loadCityStreets() {
 }
 
 function saveCityStreets() {
+  if (!requireManagerAccess()) return;
   const city = document.getElementById("city-input").value.trim();
   const lineId = assignLineSelect.value;
   const textarea = document.getElementById("city-streets-textarea");
@@ -1429,6 +1473,7 @@ function renderCityDatabaseSelect() {
 }
 
 function saveCityDatabaseStreets() {
+  if (!requireManagerAccess()) return;
   const select = document.getElementById("city-database-select");
   const textarea = document.getElementById("city-database-textarea");
   const city = select.value;
@@ -1445,10 +1490,11 @@ function saveCityDatabaseStreets() {
 }
 
 function resetCityDatabaseStreets() {
+  if (!requireManagerAccess()) return;
   const select = document.getElementById("city-database-select");
   const city = select.value;
 
-  if (!city) return;
+  if (!city || !isSafeObjectKey(city)) return;
 
   const renames = readStore(STORAGE_KEYS.cityRenames, {});
   const originalName = Object.keys(renames).find((oldName) => renames[oldName] === city) || city;
@@ -1475,6 +1521,7 @@ function resetCityDatabaseStreets() {
 }
 
 function addNewCityToDatabase() {
+  if (!requireManagerAccess()) return;
   const input = document.getElementById("new-city-input");
   const city = input.value.trim();
 
@@ -1494,6 +1541,7 @@ function addNewCityToDatabase() {
 }
 
 function renameCityInDatabase() {
+  if (!requireManagerAccess()) return;
   const select = document.getElementById("city-database-select");
   const oldName = select.value;
   const newNameInput = document.getElementById("rename-city-input");
@@ -1503,6 +1551,11 @@ function renameCityInDatabase() {
 
   if (!newName) {
     window.alert("הזן שם חדש לעיר");
+    return;
+  }
+
+  if (!isSafeObjectKey(newName) || !isSafeObjectKey(oldName)) {
+    window.alert("שם עיר לא חוקי");
     return;
   }
 
