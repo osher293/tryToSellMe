@@ -44,6 +44,16 @@ const ROLE_LABELS = {
 
 const MANAGER_ROLES = new Set(["admin", "manager"]);
 const PROTECTED_SCREENS = new Set(["search-screen", "result-screen", "history-screen", "admin-screen"]);
+const ROLE_RANK = { worker: 1, manager: 2, admin: 3 };
+
+function canActorChangeTargetRole(actorRole, targetRole) {
+  if (actorRole === "admin") return true;
+  return ROLE_RANK[actorRole] > ROLE_RANK[targetRole];
+}
+
+function assignableRolesFor(actorRole) {
+  return Object.keys(ROLE_RANK).filter((role) => ROLE_RANK[role] <= ROLE_RANK[actorRole]);
+}
 
 // חשבון אדמין-התאוששות: מבטיח כניסה תמיד למספר הזה, גם אם ה-localStorage נמצא במצב לא תקין.
 // הסיסמה לא נשמרת כטקסט גלוי בקוד - רק טביעת SHA-256 שלה, ונבדקת בהשוואת hash.
@@ -63,6 +73,7 @@ let currentSession = readStore(STORAGE_KEYS.session, null);
 let pendingPhone = "";
 let suggestionHideTimer = null;
 let currentLineStreetsModalLineId = null;
+let currentLineCityStreetsCity = null;
 let currentEditLineId = null;
 
 function readStore(key, fallback) {
@@ -764,16 +775,20 @@ function renderWorkers(filter = "") {
       phoneCell.appendChild(codeBtn);
     }
 
+    const canChangeThisUser =
+      user.id !== currentSession.user_id && canActorChangeTargetRole(currentSession.role, user.role);
+
     const roleSelect = document.createElement("select");
     roleSelect.setAttribute("aria-label", `הרשאת ${phoneLabel}`);
-    ["worker", "manager", "admin"].forEach((role) => {
+    const selectableRoles = canChangeThisUser ? assignableRolesFor(currentSession.role) : ["worker", "manager", "admin"];
+    selectableRoles.forEach((role) => {
       const option = document.createElement("option");
       option.value = role;
       option.textContent = ROLE_LABELS[role];
       option.selected = user.role === role;
       roleSelect.appendChild(option);
     });
-    roleSelect.disabled = user.id === currentSession.user_id;
+    roleSelect.disabled = !canChangeThisUser;
     roleSelect.addEventListener("change", () => {
       const usersAll = authRepository.getUsers();
       const target = usersAll.find((item) => item.id === user.id);
@@ -792,7 +807,7 @@ function renderWorkers(filter = "") {
     removeBtn.type = "button";
     removeBtn.className = "danger-btn";
     removeBtn.textContent = "הסר";
-    removeBtn.disabled = user.id === currentSession.user_id;
+    removeBtn.disabled = !canChangeThisUser;
     removeBtn.addEventListener("click", () => {
       const orgUsers = authRepository.getOrgUsers(currentSession.organization_id);
       const admins = orgUsers.filter((item) => item.role === "admin");
@@ -968,17 +983,23 @@ function deleteLine(line) {
   renderAdmin();
 }
 
-function formatAssignmentLine(assignment) {
-  if (assignment.street) return `${assignment.city} - ${assignment.street}`;
-  return assignment.query;
+function getAssignmentCity(assignment) {
+  return assignment.city || assignment.query;
+}
+
+function getLineCities(lineId) {
+  const cities = new Set();
+  dataRepository.getAllAssignments().forEach((item) => {
+    if (item.line_id === lineId) cities.add(getAssignmentCity(item));
+  });
+  return Array.from(cities).sort((a, b) => a.localeCompare(b, "he"));
 }
 
 function openLineStreetsModal(line) {
   currentLineStreetsModalLineId = line.id;
-  document.getElementById("line-streets-modal-title").textContent = `רחובות משוייכים לקו ${line.number}`;
-
-  const assignments = dataRepository.getAllAssignments().filter((item) => item.line_id === line.id);
-  document.getElementById("line-streets-modal-textarea").value = assignments.map(formatAssignmentLine).join("\n");
+  document.getElementById("line-streets-modal-title").textContent = `ערים ורחובות של קו ${line.number}`;
+  document.getElementById("line-add-city-input").value = "";
+  renderLineCitiesList(line.id);
   document.getElementById("line-streets-modal").classList.remove("hidden");
 }
 
@@ -987,74 +1008,181 @@ function closeLineStreetsModal() {
   currentLineStreetsModalLineId = null;
 }
 
-function saveLineStreetsModal() {
-  if (!currentLineStreetsModalLineId) return;
+function renderLineCitiesList(lineId) {
+  const container = document.getElementById("line-cities-list");
+  container.innerHTML = "";
 
-  const lineId = currentLineStreetsModalLineId;
-  const rawLines = document
-    .getElementById("line-streets-modal-textarea")
-    .value.split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const cities = getLineCities(lineId);
 
-  const existingByFormat = new Map(
-    dataRepository
+  if (!cities.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "אין עדיין ערים משויכות לקו זה";
+    container.appendChild(empty);
+    return;
+  }
+
+  cities.forEach((city) => {
+    const count = dataRepository
       .getAllAssignments()
-      .filter((item) => item.line_id === lineId)
-      .map((item) => [formatAssignmentLine(item), item])
+      .filter((item) => item.line_id === lineId && getAssignmentCity(item) === city).length;
+
+    const row = document.createElement("div");
+    row.className = "line-city-row";
+
+    const name = document.createElement("b");
+    name.textContent = `${city} (${count} רחובות)`;
+
+    const actions = document.createElement("div");
+    actions.className = "line-city-row-actions";
+
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.textContent = "ערוך רחובות";
+    editBtn.addEventListener("click", () => openLineCityStreetsModal(lineId, city));
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "danger-btn";
+    removeBtn.textContent = "הסר עיר";
+    removeBtn.addEventListener("click", () => removeCityFromLine(lineId, city));
+
+    actions.append(editBtn, removeBtn);
+    row.append(name, actions);
+    container.appendChild(row);
+  });
+}
+
+function removeCityFromLine(lineId, city) {
+  if (!window.confirm(`להסיר את כל הרחובות של ${city} מהקו הזה?`)) return;
+
+  dataRepository.saveAssignments(
+    dataRepository.getAllAssignments().filter((item) => !(item.line_id === lineId && getAssignmentCity(item) === city))
   );
 
-  const finalEntries = [];
-  const usedKeys = new Set();
+  renderLineCitiesList(lineId);
+  renderAdmin();
+}
 
-  const addEntry = (key, buildEntry) => {
-    if (usedKeys.has(key)) return;
-    usedKeys.add(key);
-    finalEntries.push(existingByFormat.get(key) || buildEntry());
-  };
+async function addCityToLine() {
+  const input = document.getElementById("line-add-city-input");
+  const cityInput = input.value.trim();
+  const lineId = currentLineStreetsModalLineId;
 
-  rawLines.forEach((rawLine) => {
-    const dashIndex = rawLine.indexOf(" - ");
+  if (!cityInput || !lineId) {
+    window.alert("הזן שם עיר");
+    return;
+  }
 
-    if (dashIndex !== -1) {
-      const city = rawLine.slice(0, dashIndex).trim();
-      const streets = rawLine
-        .slice(dashIndex + 3)
+  try {
+    await ensureCityStreetsLoaded();
+  } catch (error) {
+    window.alert("טעינת מאגר הרחובות נכשלה. בדוק שהקובץ data/cities-streets.json נגיש מהשרת שאתה מריץ, ונסה לרענן את הדף.");
+    return;
+  }
+
+  const matchedCity = findCityMatch(cityInput);
+  if (!matchedCity) {
+    window.alert('העיר לא נמצאה במאגר. ניתן להוסיף אותה במסך "מאגר רחובות לפי עיר" שבניהול, ולחזור לכאן.');
+    return;
+  }
+
+  if (getLineCities(lineId).includes(matchedCity)) {
+    window.alert(`${matchedCity} כבר משויכת לקו הזה`);
+    return;
+  }
+
+  const streets = getCityStreets(matchedCity);
+  if (!streets.length) {
+    window.alert("אין עדיין רחובות שמורים לעיר הזו במאגר");
+    return;
+  }
+
+  const newAssignments = streets.map((street) => ({
+    id: createId("asgn"),
+    line_id: lineId,
+    query: `${street} ${matchedCity}`,
+    city: matchedCity,
+    street,
+    organization_id: currentSession.organization_id,
+  }));
+
+  dataRepository.saveAssignments([...dataRepository.getAllAssignments(), ...newAssignments]);
+  input.value = "";
+  renderLineCitiesList(lineId);
+  renderAdmin();
+  window.alert(`${matchedCity} נוספה לקו עם ${streets.length} רחובות`);
+}
+
+function openLineCityStreetsModal(lineId, city) {
+  currentLineCityStreetsCity = city;
+  document.getElementById("line-city-streets-modal-title").textContent = `רחובות בעיר ${city}`;
+
+  const streetLines = dataRepository
+    .getAllAssignments()
+    .filter((item) => item.line_id === lineId && getAssignmentCity(item) === city)
+    .map((item) => item.street || item.query);
+
+  document.getElementById("line-city-streets-modal-textarea").value = streetLines.join("\n");
+  document.getElementById("line-city-streets-modal").classList.remove("hidden");
+}
+
+function closeLineCityStreetsModal() {
+  document.getElementById("line-city-streets-modal").classList.add("hidden");
+  currentLineCityStreetsCity = null;
+}
+
+function saveLineCityStreetsModal() {
+  const lineId = currentLineStreetsModalLineId;
+  const city = currentLineCityStreetsCity;
+  if (!lineId || !city) return;
+
+  const newStreets = [];
+  const usedStreets = new Set();
+
+  document
+    .getElementById("line-city-streets-modal-textarea")
+    .value.split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .forEach((rawLine) => {
+      rawLine
         .split(",")
         .map((item) => item.trim())
-        .filter(Boolean);
+        .filter(Boolean)
+        .forEach((street) => {
+          if (usedStreets.has(street)) return;
+          usedStreets.add(street);
+          newStreets.push(street);
+        });
+    });
 
-      streets.forEach((street) => {
-        addEntry(`${city} - ${street}`, () => ({
-          id: createId("asgn"),
-          line_id: lineId,
-          query: `${street} ${city}`,
-          city,
-          street,
-          organization_id: currentSession.organization_id,
-        }));
-      });
-      return;
-    }
+  const existingByStreet = new Map(
+    dataRepository
+      .getAllAssignments()
+      .filter((item) => item.line_id === lineId && getAssignmentCity(item) === city)
+      .map((item) => [item.street || item.query, item])
+  );
 
-    rawLine
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean)
-      .forEach((query) => {
-        addEntry(query, () => ({
-          id: createId("asgn"),
-          line_id: lineId,
-          query,
-          city: query.split(" ").pop() || query,
-          organization_id: currentSession.organization_id,
-        }));
-      });
-  });
+  const finalEntries = newStreets.map(
+    (street) =>
+      existingByStreet.get(street) || {
+        id: createId("asgn"),
+        line_id: lineId,
+        query: `${street} ${city}`,
+        city,
+        street,
+        organization_id: currentSession.organization_id,
+      }
+  );
 
-  const otherAssignments = dataRepository.getAllAssignments().filter((item) => item.line_id !== lineId);
+  const otherAssignments = dataRepository
+    .getAllAssignments()
+    .filter((item) => !(item.line_id === lineId && getAssignmentCity(item) === city));
+
   dataRepository.saveAssignments([...otherAssignments, ...finalEntries]);
-  closeLineStreetsModal();
+  closeLineCityStreetsModal();
+  renderLineCitiesList(lineId);
   renderAdmin();
   window.alert("השינויים נשמרו");
 }
@@ -1597,10 +1725,15 @@ document.getElementById("city-database-select").addEventListener("change", loadS
 document.getElementById("save-city-database-btn").addEventListener("click", saveCityDatabaseStreets);
 document.getElementById("reset-city-database-btn").addEventListener("click", resetCityDatabaseStreets);
 document.getElementById("add-city-btn").addEventListener("click", addNewCityToDatabase);
-document.getElementById("line-streets-modal-save").addEventListener("click", saveLineStreetsModal);
 document.getElementById("line-streets-modal-close").addEventListener("click", closeLineStreetsModal);
 document.getElementById("line-streets-modal").addEventListener("click", (event) => {
   if (event.target.id === "line-streets-modal") closeLineStreetsModal();
+});
+document.getElementById("line-add-city-btn").addEventListener("click", addCityToLine);
+document.getElementById("line-city-streets-modal-save").addEventListener("click", saveLineCityStreetsModal);
+document.getElementById("line-city-streets-modal-close").addEventListener("click", closeLineCityStreetsModal);
+document.getElementById("line-city-streets-modal").addEventListener("click", (event) => {
+  if (event.target.id === "line-city-streets-modal") closeLineCityStreetsModal();
 });
 document.getElementById("edit-line-modal-save").addEventListener("click", saveEditLineModal);
 document.getElementById("edit-line-modal-close").addEventListener("click", closeEditLineModal);
@@ -1617,6 +1750,7 @@ bindEnterKey(addressSearch, () => document.getElementById("search-btn").click())
 bindEnterKey(document.getElementById("new-worker"), addWorker);
 bindEnterKey(document.getElementById("assign-line"), assignAddress);
 bindEnterKey(document.getElementById("city-input"), loadCityStreets);
+bindEnterKey(document.getElementById("line-add-city-input"), addCityToLine);
 
 initApp();
 registerServiceWorker();

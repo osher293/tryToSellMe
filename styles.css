@@ -130,6 +130,38 @@ label {
   max-height: 420px;
 }
 
+.line-city-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.line-city-row:first-child {
+  border-top: 0;
+}
+
+.line-city-row-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.line-city-row-actions button {
+  min-height: 40px;
+  padding: 0 14px;
+  background: #e5edf7;
+  color: var(--primary-dark);
+}
+
+.line-city-row-actions button.danger-btn {
+  background: #fee2e2;
+  color: var(--danger);
+}
+
 .card {
   background: var(--surface);
   border: 1px solid var(--border);

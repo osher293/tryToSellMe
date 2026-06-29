@@ -285,12 +285,30 @@
     <div class="modal-overlay hidden" id="line-streets-modal">
       <div class="card modal-card">
         <div class="card-heading">
-          <h3 id="line-streets-modal-title">רחובות משוייכים לקו</h3>
+          <h3 id="line-streets-modal-title">ערים ורחובות של קו</h3>
           <button class="icon-btn" id="line-streets-modal-close" type="button" aria-label="סגור">×</button>
         </div>
-        <p class="auth-hint">כל הכתובות המשוייכות לקו זה (עיר - רחוב). מחק שורה כדי להסיר שיוך. אפשר גם להוסיף שורה חדשה בפורמט "עיר - רחוב1, רחוב2, רחוב3" כדי לשייך כמה רחובות בעיר אחת בבת אחת. לחץ שמור בסוף.</p>
-        <textarea id="line-streets-modal-textarea" rows="16"></textarea>
-        <button class="primary-btn full-width" id="line-streets-modal-save" type="button">שמור שינויים</button>
+        <p class="auth-hint">קבלן יכול להיות אחראי על כמה ערים. הוסף כל עיר בנפרד, ולחץ "ערוך רחובות" כדי לראות/לערוך את הרחובות שלה בקו הזה בלבד.</p>
+        <div id="line-cities-list"></div>
+        <div class="admin-subsection">
+          <label for="line-add-city-input">הוספת עיר לקו (כל הרחובות שלה ייטענו מהמאגר)</label>
+          <div class="inline-action">
+            <input id="line-add-city-input" type="text" placeholder="לדוגמה: תל אביב" />
+            <button id="line-add-city-btn" type="button">הוסף</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay hidden" id="line-city-streets-modal">
+      <div class="card modal-card">
+        <div class="card-heading">
+          <h3 id="line-city-streets-modal-title">רחובות בעיר</h3>
+          <button class="icon-btn" id="line-city-streets-modal-close" type="button" aria-label="סגור">×</button>
+        </div>
+        <p class="auth-hint">רחוב בכל שורה. מחק שורה כדי להסיר, או הוסף שורה חדשה (אפשר גם כמה רחובות מופרדים בפסיק בשורה אחת).</p>
+        <textarea id="line-city-streets-modal-textarea" rows="16"></textarea>
+        <button class="primary-btn full-width" id="line-city-streets-modal-save" type="button">שמור שינויים</button>
       </div>
     </div>
 
